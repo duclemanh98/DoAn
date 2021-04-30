@@ -22,7 +22,8 @@ CREATE TABLE LocationTable (
 );
 
 CREATE TABLE ProductTypeTable (
-	id VARCHAR(15) NOT NULL PRIMARY KEY,
+	no_id INT AUTO_INCREMENT PRIMARY KEY,
+	id VARCHAR(15) NOT NULL UNIQUE,
     cur_name VARCHAR(100) NOT NULL,
     max_amount INT NOT NULL
 );
@@ -83,7 +84,7 @@ CREATE TABLE SingleOutProductTable (
     FOREIGN KEY (paper_id) REFERENCES OutPaperTable(id),
     PRIMARY KEY (id, paper_id)
 );
-
+DROP TABLE ProductTypeTable;
 DROP TABLE SingleOutProductTable;
 DROP TABLE FactTable;
 DROP TABLE TotalOutProductTable;
