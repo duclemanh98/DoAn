@@ -42,21 +42,6 @@ function check_login(req) {
  */
 app.post('/userLogin', async(req, res) => {
     console.log(req.body.username, req.body.password);
-    // if(check_login(req) == false) return res.json(false);
-    // else return res.json(true);
-    // pool.query("CALL check_login(?, ?, @checking_val);SELECT @checking_val AS retval",[req.body.username, req.body.password], function(err, result){
-    //     if(err) throw err;
-    //     if(result[1][0].retval == 0) {
-    //         console.log("No account");
-    //         return(res.json(false));
-    //         //return res.json(false);
-    //     }
-    //     else {
-    //         console.log("Correct Account");
-    //         return(res.json(true));
-    //         //return res.json()
-    //     }
-    // });
     try {
         var query_result = await check_login(req);
         //console.log(query_result);
@@ -88,22 +73,31 @@ app.post('/userAdd', function(req, res){
  * 
  *  Note: change return value according to display
  */
-app.post('/userDelete', function(req, res){
-    pool.query('CALL check_login(?, ?, @val);SELECT @val AS retval',[req.body.username, req.body.password], function(err, results){
-        if(err) return res.json(err);
-        if(result[1][0].retval == 0) {
-            return res.json("Wrong username or password");
-        }
-        else {
-            pool.query('CALL delete_user(?,?)',[req.body.username, req.body.password], function(err, results){
-                if(err) return res.json(err);
-                return res.json("Delete Success");
-            })
-        }
-    })
+app.post('/userDelete', async(req, res) => {
+    var query_result = await check_login(req);
+    if(query_result == false) {
+        return res.json("No account");
+    }
+    else {
+        pool.query('CALL delete_user(?,?)',[req.body.username, req.body.password], function(err){
+            if(err) throw err;
+            return res.json("Success");
+        });
+    }
 })
 
+/*
+ *  Note: getting product name and product/box
+ */
 
+app.post('/getProductType', function(req, res) {
+    console.log("Get product type");
+    pool.query('SELECT cur_name, max_amount FROM ProductTypeTable LIMIT 5', function(err, result){
+        if(err) throw err;
+        //console.log(result);
+        res.send(JSON.parse(JSON.stringify(result)));
+    });
+})
 
 app.listen(port, () => {
     console.log(`App listening at http://localhost:${port}`);
