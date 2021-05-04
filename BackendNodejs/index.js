@@ -52,15 +52,16 @@ app.post('/userLogin', async(req, res) => {
     }
 });
 
+
 /*
  *  @brief: API to add user into database
  *  request: json include: username, password, auth
  */
-app.post('/userAdd', function(req, res){
-    pool.query('CALL add_user(?,?,?)',[req.body.username, req.body.password, req.body.auth], function(err, results){
+app.post('/addUser', function(req, res){
+    console.log(req);
+    pool.query('CALL add_user(?,?,?)',[req.body.username, req.body.password, req.body.role], function(err, results){
         if(err) {
-            return res.json(err);
-            throw err;
+            return res.json(false);
         }
         console.log("Add successfully");
         return (res.json(true));
@@ -87,18 +88,29 @@ app.post('/userDelete', async(req, res) => {
 })
 
 /*
+ *******************************************************
+ *******************************************************
+ */
+
+/*
  *  Note: getting product name and product/box
  */
 
 app.post('/getProductType', function(req, res) {
     console.log("Get product type");
-    pool.query('SELECT cur_name, max_amount FROM ProductTypeTable LIMIT 5', function(err, result){
+    pool.query('SELECT no_id, cur_name, max_amount FROM ProductTypeTable LIMIT 5', function(err, result){
         if(err) throw err;
         //console.log(result);
         res.send(JSON.parse(JSON.stringify(result)));
     });
 })
 
+
+
+/*
+ *******************************************************************
+ *******************************************************************
+ */
 app.listen(port, () => {
     console.log(`App listening at http://localhost:${port}`);
 });
