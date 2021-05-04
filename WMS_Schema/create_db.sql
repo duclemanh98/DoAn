@@ -17,15 +17,18 @@ CREATE TABLE LocationTable (
     room INT NOT NULL,
     rack INT NOT NULL,
     rack_bin INT NOT NULL,
-    bin_status CHAR(4) DEFAULT 'free'
+    bin_status CHAR(4) DEFAULT 'free',
     #bin_status has 2 values: 'free' or 'occu'
+    priority INT				#0: lowest priority, highest priority
 );
 
 CREATE TABLE ProductTypeTable (
 	no_id INT AUTO_INCREMENT PRIMARY KEY,
 	id VARCHAR(15) NOT NULL UNIQUE,
     cur_name VARCHAR(100) NOT NULL,
-    max_amount INT NOT NULL
+    max_amount INT NOT NULL,
+    turn_over FLOAT DEFAULT 0,
+    pareto_type CHAR(1) DEFAULT 'C'					#this type includes 3 value: A, B or C
 );
 
 CREATE TABLE InPaperTable (

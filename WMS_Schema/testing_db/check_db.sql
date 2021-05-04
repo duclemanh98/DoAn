@@ -11,3 +11,7 @@ SELECT * FROM ProductTypeTable;
 #### Delete data from table
 DELETE FROM InProductTable;
 DELETE FROM InPaperTable;
+
+#-------------------------------
+### use these command to clear value from LocationTable
+UPDATE LocationTable SET bin_status = 'free';

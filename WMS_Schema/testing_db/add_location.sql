@@ -3840,3 +3840,4 @@ values
 (1,3,8,4,38),
 (1,3,8,4,39),
 (1,3,8,4,40);
+SELECT * FROM locationtable;
