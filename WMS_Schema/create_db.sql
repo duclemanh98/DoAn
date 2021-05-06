@@ -12,23 +12,33 @@ USE wms_db;
 
 CREATE TABLE LocationTable (
 	id INT auto_increment PRIMARY KEY, 
-    building INT NOT NULL,
+    building CHAR(1) NOT NULL,			#'I' or 'J' or 'K'
     building_floor INT NOT NULL,
     room INT NOT NULL,
     rack INT NOT NULL,
     rack_bin INT NOT NULL,
     bin_status CHAR(4) DEFAULT 'free',
     #bin_status has 2 values: 'free' or 'occu'
-    priority INT				#0: lowest priority, highest priority
+    priority INT,				#0: lowest priority, highest priority
+    class_type CHAR(1) DEFAULT 'C'		#use for class type: A or B or C
 );
 
 CREATE TABLE ProductTypeTable (
 	no_id INT AUTO_INCREMENT PRIMARY KEY,
 	id VARCHAR(15) NOT NULL UNIQUE,
-    cur_name VARCHAR(100) NOT NULL,
+    cur_name VARCHAR(100) NOT NULL UNIQUE,
     max_amount INT NOT NULL,
-    turn_over FLOAT DEFAULT 0,
     pareto_type CHAR(1) DEFAULT 'C'					#this type includes 3 value: A, B or C
+);
+
+CREATE TABLE ProductTypeAnalysis (
+	id VARCHAR(15) NOT NULL UNIQUE,
+    previous_time TIMESTAMP DEFAULT NOW(),
+    previous_amount INT DEFAULT 0,
+    current_amount INT DEFAULT 0,
+    current_sale INT DEFAULT 0,
+	turn_over FLOAT DEFAULT 0,
+    FOREIGN KEY(id) REFERENCES ProductTypeTable(id)
 );
 
 CREATE TABLE InPaperTable (
@@ -87,10 +97,13 @@ CREATE TABLE SingleOutProductTable (
     FOREIGN KEY (paper_id) REFERENCES OutPaperTable(id),
     PRIMARY KEY (id, paper_id)
 );
-DROP TABLE ProductTypeTable;
+
 DROP TABLE SingleOutProductTable;
 DROP TABLE FactTable;
 DROP TABLE TotalOutProductTable;
 DROP TABLE OutPaperTable;
 DROP TABLE InProductTable;
 DROP TABLE InPaperTable;
+DROP TABLE ProductTypeAnalysis;
+DROP TABLE ProductTypeTable;
+DROP TABLE LocationTable;

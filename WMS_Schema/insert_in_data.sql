@@ -3,9 +3,9 @@
 #----------------------------------------------------------
 DELIMITER &&
 DROP PROCEDURE IF EXISTS create_in_paper_with_date;
-CREATE PROCEDURE create_in_paper_with_date(IN supply VARCHAR(100), IN create_time DATE)
+CREATE PROCEDURE create_in_paper_with_date(IN supply VARCHAR(100), IN create_time DATETIME)
 BEGIN
-	INSERT INTO InPaperTable(supplier, created_at) VALUES (supply, create_time);
+	INSERT INTO InPaperTable(supplier, created_at) VALUES (supply, DATE(create_time));
 END &&
 DELIMITER ;
 
@@ -22,8 +22,11 @@ DELIMITER ;
 ### Insert 1 product type into in paper/use for admin when creating in paper
 DELIMITER &&
 DROP PROCEDURE IF EXISTS add_product_in_paper;
-CREATE PROCEDURE add_product_in_paper(IN paper INT, IN product_type VARCHAR(15), IN amount INT)
+CREATE PROCEDURE add_product_in_paper(IN paper INT, IN product_name VARCHAR(100), IN amount INT)
 BEGIN
+	DECLARE product_type VARCHAR(15);
+    SELECT id INTO product_type FROM ProductTypeTable
+    WHERE ProductTypeTable.cur_name = product_name;
 	INSERT INTO InProductTable(id, paper_id, box_amount) VALUES (product_type, paper, amount);
 END &&
 DELIMITER ;

@@ -31,6 +31,16 @@ function check_login(req) {
         });
     })
 }
+/*
+ *  This function will check if the array has duplicate value, which is used when creating paper (adding product step)
+ *  @param:     array: array that need to be checked
+ *  @retval:    true if there are duplicate products
+ *              false if no duplicate product
+ */
+
+function check_duplicate(array) {
+    return new Set(array).size !== array.length;
+}
 
 //----------------------------------------------------------------------------------------//
 /*
@@ -58,7 +68,7 @@ app.post('/userLogin', async(req, res) => {
  *  request: json include: username, password, auth
  */
 app.post('/addUser', function(req, res){
-    console.log(req);
+    //console.log(req);
     pool.query('CALL add_user(?,?,?)',[req.body.username, req.body.password, req.body.role], function(err, results){
         if(err) {
             return res.json(false);
@@ -88,9 +98,58 @@ app.post('/userDelete', async(req, res) => {
 })
 
 /*
- *******************************************************
- *******************************************************
+ *  @brief: API to create new in paper
+ *  request: json file include supplier and created_date
+ * 
+ *  @retval: ID of paper
  */
+app.post('/inPaperCreate', function(req, res){
+    let created_at = new Date(req.body.year, req.body.month - 1, req.body.date);
+    //let created_at = new Date(2021, 00, 31);
+    console.log(created_at);
+    pool.query("CALL create_in_paper_with_date(?, ?)", [req.body.store, created_at], function(err, results){
+        if(err) return res.json(0);
+        pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
+            if(err) throw err;
+            return res.json(result[0].paper_id);
+        })
+    })
+})
+
+/*
+ *  @brief: API when add 1 product to specific in paper
+ *  request: json file include:
+ *      + paper_id
+ *      + cur_name (product name)
+ *      + box_amount
+ * 
+ *  @retval: ID of paper
+ */
+app.post('/addInProduct', async(req, res) => {
+    console.log(req.body.paper_id);
+    console.log(req.body.cur_name);
+    console.log(req.body.box_amount);
+    var duplicate_check = await check_duplicate(req.body.curname);
+    if(duplicate_check == true) return res.json(false);         //The array has duplicate products
+    else {
+        console.log("No duplicate product");
+        pool.query('CALL add_product_in_paper(?,?,?)',[req.body.paper_id, req.body.cur_name, req.body.box_amount], function(err, results){
+            if(err) return res.json(false);
+            return res.json(true);
+        })
+    }
+})
+
+
+
+
+/*
+ *  @brief: API to add products after user select all product for current in paper
+ *  request: json file include supplier and created_date
+ * 
+ *  @retval: ID of paper
+ */
+
 
 /*
  *  Note: getting product name and product/box
@@ -98,14 +157,24 @@ app.post('/userDelete', async(req, res) => {
 
 app.post('/getProductType', function(req, res) {
     console.log("Get product type");
-    pool.query('SELECT no_id, cur_name, max_amount FROM ProductTypeTable LIMIT 5', function(err, result){
+    pool.query('SELECT no_id, cur_name, max_amount FROM ProductTypeTable', function(err, result){
         if(err) throw err;
         //console.log(result);
         res.send(JSON.parse(JSON.stringify(result)));
     });
 })
 
-
+/*
+ *  Note: getting product/box from product name
+ *  req: json object containe product_name
+ */
+app.post('/getProdPerBox', function(req, res){
+    console.log(req.body.product_name);
+    pool.query('SELECT max_amount FROM ProductTypeTable WHERE cur_name = ?',[req.body.product_name], function(err, results){
+        if(err) return res.json(0);
+        return res.json(results[0].max_amount);
+    })
+})
 
 /*
  *******************************************************************
