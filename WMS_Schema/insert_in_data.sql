@@ -85,7 +85,8 @@ END &&
 DELIMITER ;
 
 #----------------------------------------------------------
-### insert product into fact table (used with increase_in_scan_product) ### Deprecated
+### insert product into fact table (used with increase_in_scan_product) 
+### Deprecated
 DELIMITER &&
 DROP PROCEDURE IF EXISTS add_product_fact_table;
 CREATE PROCEDURE add_product_fact_table(IN product_id INT, IN in_paper INT, IN product_type VARCHAR(15))
@@ -98,7 +99,8 @@ END &&
 DELIMITER ;
 
 #-----------------------------------------------------------
-### add location into product after calculation / when user finish scanning ### Deprecated
+### add location into product after calculation / when user finish scanning 
+### Deprecated
 DELIMITER &&
 DROP PROCEDURE IF EXISTS add_location_product;
 CREATE PROCEDURE add_location_product(IN product_id INT, IN location INT)
@@ -148,3 +150,36 @@ END &&
 DELIMITER ;
 
 #------------------------------------------------------
+#### Choosing location for each type of product
+#### this also updates status of location to 'temp', which means it is assigned to a value but hasnt been stored yet
+DELIMITER &&
+DROP PROCEDURE IF EXISTS assign_location_in_product;
+CREATE PROCEDURE assign_location_in_product(IN product_id INT)
+BEGIN
+	DECLARE product_class CHAR(1);
+    DECLARE id_location INT;
+    
+    SELECT pareto_type INTO product_class FROM ProductTypeTable
+    JOIN FactTable
+    ON ProductTypeTable.id = FactTable.product_type_id
+    WHERE product_id = FactTable.id;
+    
+    SELECT LocationTable.id INTO id_location FROM LocationTable
+    WHERE LocationTable.class_type = product_class AND LocationTable.bin_status = 'free'
+    ORDER BY priority DESC, id ASC LIMIT 1;
+    
+    UPDATE LocationTable SET bin_status = 'temp' WHERE id = id_location;
+    UPDATE FactTable SET FactTable.location_id = id_location WHERE FactTable.id = product_id;
+    
+    SELECT id FROM LocationTable WHERE id = id_location;
+END &&
+DELIMITER ;
+#------------------------------------------------
+##### After finishing put product into place, workers press submit =>update location to occu
+DELIMITER &&
+DROP PROCEDURE IF EXISTS finish_storage_location;
+CREATE PROCEDURE finish_storage_location(IN id_location INT)
+BEGIN
+	UPDATE LocationTable SET bin_status = 'occu' WHERE id = id_location;
+END &&
+DELIMITER ;

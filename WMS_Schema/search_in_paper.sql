@@ -17,7 +17,7 @@ DROP PROCEDURE IF EXISTS search_in_paper_first_date;
 CREATE PROCEDURE search_in_paper_first_date(IN first_date DATE)
 BEGIN
 	SELECT * FROM InPaperTable
-    WHERE CAST(created_at AS DATE) >= first_date;
+    WHERE CAST(created_at AS DATE) >= CAST(first_date AS DATE);
 END &&
 DELIMITER ;
 #------------------------------------------------
@@ -27,7 +27,7 @@ DROP PROCEDURE IF EXISTS search_in_paper_last_date;
 CREATE PROCEDURE search_in_paper_last_date(IN last_date DATE)
 BEGIN
 	SELECT * FROM InPaperTable
-    WHERE CAST(created_at AS DATE) <= last_date;
+    WHERE CAST(created_at AS DATE) <= CAST(last_date AS DATE);
 END &&
 DELIMITER ;
 #------------------------------------------------

@@ -44,7 +44,7 @@ CREATE TABLE ProductTypeAnalysis (
 CREATE TABLE InPaperTable (
 	id INT auto_increment PRIMARY KEY,
     supplier VARCHAR(100),
-    created_at TIMESTAMP DEFAULT NOW(),
+    created_at DATE DEFAULT NOW(),
 	cur_status CHAR(1) NOT NULL DEFAULT 'p'
     #cur_status has 2 values: 'p' = pending or 'c' = complete
 );
