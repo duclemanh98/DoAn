@@ -200,97 +200,38 @@ app.post('/getProductType', function(req, res) {
  */
 
 app.post('/displayAllInPaper', function(req, res){
+    console.log("Display all in paper");
     pool.query('SELECT * FROM InPaperTable', function(err, results){
         if(err) throw err;
+        for(var i = 0; i < results.length; i++){
+            results[i].created_at = results[i].created_at.split(' ')[0];
+        }
         res.send(JSON.parse(JSON.stringify(results)));
     })
 })
 
 /*
+ *  '/getDetailInPaper'
  *  @brief: API to show specific in paper
- *  req includes:
- *  keyword
- *  firstDate
- *  lastDate
+ *  req includes: id --- id of paper
  *
  * 
- *  @retval: object contain all info about date
- *  id                      --id of paper
- *  supplier                --supplier
- *  created_at              --date that paper is created
- *  cur_status              --status of paper
+ *  @retval: object contain all info about product in paper
+ *  id                  ---- id of product
+ *  cur_name            ---- name of product
+ *  perbox              ---- number of product per box
+ *  box_amount          ---- number of boxes of product in current paper
+ *  scan_number         ---- number of scanned box
  */
-
-app.post('/searchInPaper', function(req, res){
-    console.log(req.body.keyword);
-    console.log(req.body.firstDate);
-    console.log(req.body.lastDate);
-
-    var first_date = date_convert(req.body.firstDate);
-    var last_date = date_convert(req.body.lastDate);
-    //console.log(first_date);
-
-        //No search
-    if(req.body.keyword == '' && req.body.firstDate == '' && req.body.lastDate == ''){
-        console.log("Receive Nothing");
-        pool.query('CALL show_all_in_paper', function(err, results){
-            if(err) throw err;
-            return(JSON.parse(JSON.stringify(results)));
-        })
-    }
-    if(req.body.keyword == '') {
-        //search last date only
-        if(req.body.firstDate == '') {
-            pool.query('CALL search_in_paper_last_date(?)',[last_date], function(err, rows){
-                if(err) throw err;
-                return(JSON.parse(JSON.stringify(rows)));
-            })
-        //search first date only
-        } else if(req.body.lastDate == '') {
-            pool.query('CALL search_in_paper_first_date(?)',[first_date], function(err, rows){
-                if(err) throw err;
-                return(JSON.parse(JSON.stringify(rows)));
-            })
-        }
-        //search both dates
-        else {
-            pool.query('CALL search_in_paper_dates(?,?)',[first_date, last_date], function(err, rows){
-                if(err) throw err;
-                return(JSON.parse(JSON.stringify(rows)));
-            })
-        }
-    }
-    else if(req.body.firstDate == '') {
-        //search keyword only
-        if(req.body.lastDate == '') {
-            pool.query('CALL search_in_paper_keyword(?)',[req.body.keyword], function(err, rows){
-                if(err) throw err;
-                return(JSON.parse(JSON.stringify(rows)));
-            })
-        }
-        //search keyword and last date
-        else {
-            pool.query('CALL search_in_paper_last_date_keyword(?,?)',[last_date, req.body.keyword], function(err, rows){
-                if(err) throw err;
-                return(JSON.parse(JSON.stringify(rows)));
-            })
-        }
-    }
-    else if(req.body.lastDate == '') {
-        //search first date and keyword
-        pool.query('CALL search_in_paper_first_date_keyword(?,?)',[first_date, req.body.keyword], function(err, rows){
-            if(err) throw err;
-            return(JSON.parse(JSON.stringify(rows)));
-        })
-    }
-    else {
-        //search with all 3
-        pool.query('CALL search_in_paper_dates_keyword(?,?,?)',[first_date, last_date, req.body.keyword], function(err, rows){
-            if(err) throw err;
-            return(JSON.parse(JSON.stringify(rows)));
-        })
-    }
+app.post('/getDetailInPaper', function(req, res) {
+    // console.log(req.body);
+    console.log("Get detail of paper " + req.body.id);
+    pool.query('CALL in_paper_detail(?)', [req.body.id], function(err, rows){
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
+    })
 })
+
 
 /*
  *******************************************************************

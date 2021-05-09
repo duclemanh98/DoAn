@@ -8,7 +8,8 @@ const pool = mysql.createPool({
     user: 'test_connect', // use your mysql username.
     password: 'Tuananh92!', // user your mysql password.
     database: 'wms_db',
-    multipleStatements: true
+    multipleStatements: true,
+    dateStrings : true
 });
 
 pool.getConnection((err, connection) => {

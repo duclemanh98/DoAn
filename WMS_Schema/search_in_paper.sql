@@ -7,9 +7,10 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS show_all_in_paper;
 CREATE PROCEDURE show_all_in_paper()
 BEGIN
-	SELECT * FROM InPaperTable;
+	SELECT id, supplier, CAST(created_at AS DATE) AS 'date', cur_status  FROM InPaperTable;
 END &&
 DELIMITER ;
+
 #------------------------------------------------
 ### Search in paper before first_date
 DELIMITER &&
