@@ -195,3 +195,28 @@ BEGIN
     GROUP BY TotalOutProductTable.id;
 END &&
 DELIMITER ;
+#--------------------------------------
+#### Search location according to product_id
+DELIMITER &&
+DROP PROCEDURE IF EXISTS search_location_with_product_id;
+CREATE PROCEDURE search_location_with_product_id(IN product_id INT)
+BEGIN
+	SELECT * FROM LocationTable WHERE LocationTable.id =
+    (
+		SELECT location_id FROM FactTable WHERE FactTable.id = product_id
+    );
+END &&
+DELIMITER ;
+#--------------------------------------
+#### Search product detail according to product_id
+DELIMITER &&
+DROP PROCEDURE IF EXISTS search_with_product_id;
+CREATE PROCEDURE search_with_product_id(IN product_id INT)
+BEGIN
+	SELECT ProductTypeTable.cur_name, ProductTypeTable.max_amount, LocationTable.id, building, building_floor, room, rack, rack_bin
+    FROM FactTable
+    JOIN LocationTable ON FactTable.location_id = LocationTable.id
+    JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
+    WHERE FactTable.id = product_id;
+END &&
+DELIMITER ;

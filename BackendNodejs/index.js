@@ -232,6 +232,49 @@ app.post('/getDetailInPaper', function(req, res) {
     })
 })
 
+/*
+ *  '/addInScanProduct'
+ *  @brief: API to show specific in paper
+ *  req includes:
+ *  productID:          ---- specific id of product
+ *  typeID              ---- type code of product
+ *  paperID             ---- id of paper of product
+ *
+ * 
+ *  @retval: true or false
+ *  
+ */
+app.post('/addInScanProduct', function(req, res) {
+    console.log("Add scanned product");
+    console.log(req.body);
+    var product_id = parseInt(req.body.productID);
+    if(req.body.productID==''||req.body.typeID==''||req.body.paperID=='') return;
+    pool.query('CALL add_in_scanned_product(?,?,?)', [product_id, req.body.typeID, req.body.paperID], function(err){
+        if(err) throw err;
+        pool.query('CALL search_with_product_id(?)', [product_id], function(err, rows){
+            console.log(rows[0]);
+            if(err) throw err;
+            res.send(JSON.parse(JSON.stringify(rows[0])));
+        })
+    })
+})
+
+/*
+ *  '/confirmInScanPaper'
+ *  @brief: API to confirm a paper
+ *  req includes:
+ *  paperID:    ID of in paper
+ *
+ * 
+ *  @retval: true or false
+ */
+app.post('/confirmInScanPaper', function(req, res){
+    console.log(req.body.paperID);
+    pool.query('CALL complete_in_paper(?)', [req.body.paperID], function(err, rows){
+        if(err) return res.json(false);
+        return res.json(true);
+    })
+})
 
 /*
  *******************************************************************

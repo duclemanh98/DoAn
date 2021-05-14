@@ -1,24 +1,22 @@
 SELECT * FROM FactTable;
 SELECT * FROM InPaperTable;
-SELECT * FROM InProductTable
-INNER JOIN ProductTypeTable
-ON InProductTable.id = ProductTypeTable.id;
+SELECT * FROM InProductTable ORDER BY paper_id;
 SELECT * FROM OutPaperTable;
 SELECT * FROM TotalOutProductTable;
 SELECT * FROM SingleOutProductTable;
 SELECT * FROM UserTable;
 SELECT * FROM LocationTable;
 SELECT * FROM ProductTypeTable;
-
+UPDATE inpapertable SET cur_status = 'p' WHERE id = 2;
 SELECT * FROM LocationTable WHERE bin_status != 'free';
 
 #### Delete data from table
-DELETE FROM InProductTable;
-DELETE FROM InPaperTable WHERE id > 1;
+#DELETE FROM InProductTable;
+#DELETE FROM InPaperTable WHERE id > 1;
 
 #-------------------------------
 ### use these command to clear value from LocationTable
-UPDATE LocationTable SET bin_status = 'free';
+UPDATE LocationTable SET bin_status = 'free' WHERE bin_status != 'free';
 
 CALL create_in_paper_wo_date('Kho A');
 CALL add_product_in_paper(2, 'Bích nối ống phun PPR DN 125 PN20', 2);
@@ -31,3 +29,13 @@ CALL finish_storage_location(3361);
 CALL finish_storage_location(3362);
 ##
 CALL complete_in_paper(2);
+
+SELECT * FROM LocationTable WHERE id = 3363;
+
+SELECT * FROM InProductTable WHERE paper_id = 13;
+
+CALL search_location_with_product_id(2);
+
+SELECT * FROM FactTable;
+SELECT * FROM ProductTypeTable WHERE id = 'RB14016';
+CALL search_with_product_id(4);

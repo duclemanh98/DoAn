@@ -106,3 +106,5 @@ BEGIN
 	SELECT * FROM InPaperTable WHERE id = in_paper_id;
 END &&
 DELIMITER ;
+#------------------------------------------------
+### Show location of product from ID

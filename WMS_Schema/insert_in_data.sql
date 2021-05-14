@@ -49,6 +49,7 @@ BEGIN
 	DECLARE total_box INT;
     DECLARE scan_box INT;
     DECLARE location_null_count INT;
+    DECLARE location_temp_count INT;
     
     SELECT SUM(box_amount) INTO total_box FROM InProductTable
     WHERE paper = InProductTable.paper_id;
@@ -57,9 +58,14 @@ BEGIN
     WHERE paper = InProductTable.paper_id;
     
     SELECT COUNT(*) INTO location_null_count FROM FactTable
-    WHERE FactTable.in_paper_id = paper AND FactTable.location_id = NULL;
+    WHERE FactTable.in_paper_id = paper AND ISNULL(FactTable.location_id);
     
-	IF total_box = scan_box AND location_null_count = 0 THEN
+    SELECT COUNT(*) INTO location_temp_count FROM FactTable
+    JOIN InProductTable ON InProductTable.id = FactTable.product_type_id
+    JOIN LocationTable ON FactTable.location_id = LocationTable.id
+    WHERE LocationTable.bin_status != 'occu' AND FactTable.in_paper_id = paper;
+    
+	IF total_box = scan_box AND location_null_count = 0 AND location_temp_count = 0 THEN
 		UPDATE InPaperTable SET cur_status = 'c' WHERE paper = InPaperTable.id;
 	ELSE
 		UPDATE InPaperTable SET cur_status = 'p' WHERE paper = InPaperTable.id;
@@ -151,7 +157,7 @@ DELIMITER ;
 
 #------------------------------------------------------
 #### Choosing location for each type of product
-#### this also updates status of location to 'temp', which means it is assigned to a value but hasnt been stored yet
+#### this also updates status of location to 'occu'
 DELIMITER &&
 DROP PROCEDURE IF EXISTS assign_location_in_product;
 CREATE PROCEDURE assign_location_in_product(IN product_id INT)
@@ -168,7 +174,7 @@ BEGIN
     WHERE LocationTable.class_type = product_class AND LocationTable.bin_status = 'free'
     ORDER BY priority DESC, id ASC LIMIT 1;
     
-    UPDATE LocationTable SET bin_status = 'temp' WHERE id = id_location;
+    UPDATE LocationTable SET bin_status = 'occu' WHERE id = id_location;
     UPDATE FactTable SET FactTable.location_id = id_location WHERE FactTable.id = product_id;
     
     SELECT id FROM LocationTable WHERE id = id_location;
@@ -176,6 +182,7 @@ END &&
 DELIMITER ;
 #------------------------------------------------
 ##### After finishing put product into place, workers press submit =>update location to occu
+#### Deprecated function => not used
 DELIMITER &&
 DROP PROCEDURE IF EXISTS finish_storage_location;
 CREATE PROCEDURE finish_storage_location(IN id_location INT)
