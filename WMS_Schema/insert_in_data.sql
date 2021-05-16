@@ -3,9 +3,9 @@
 #----------------------------------------------------------
 DELIMITER &&
 DROP PROCEDURE IF EXISTS create_in_paper_with_date;
-CREATE PROCEDURE create_in_paper_with_date(IN supply VARCHAR(100), IN create_time DATETIME)
+CREATE PROCEDURE create_in_paper_with_date(IN supply VARCHAR(100), IN create_time DATETIME, IN in_desc VARCHAR(100))
 BEGIN
-	INSERT INTO InPaperTable(supplier, created_at) VALUES (supply, DATE(create_time));
+	INSERT INTO InPaperTable(supplier, created_at, paper_desc) VALUES (supply, DATE(create_time), in_desc);
 END &&
 DELIMITER ;
 

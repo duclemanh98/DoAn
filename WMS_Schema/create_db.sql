@@ -44,8 +44,10 @@ CREATE TABLE ProductTypeAnalysis (
 CREATE TABLE InPaperTable (
 	id INT auto_increment PRIMARY KEY,
     supplier VARCHAR(100),
+    #receive_staff VARCHAR(50) NOT NULL DEFAULT '',
     created_at TIMESTAMP DEFAULT NOW(),
-	cur_status CHAR(1) NOT NULL DEFAULT 'p'
+	cur_status CHAR(1) NOT NULL DEFAULT 'p',
+    paper_desc VARCHAR(100) NOT NULL DEFAULT ''
     #cur_status has 2 values: 'p' = pending or 'c' = complete
 );
 
@@ -97,6 +99,14 @@ CREATE TABLE SingleOutProductTable (
     FOREIGN KEY (paper_id) REFERENCES OutPaperTable(id),
     PRIMARY KEY (id, paper_id)
 );
+
+CREATE TABLE id_barcode (
+	id INT auto_increment PRIMARY KEY,
+    product_type_id VARCHAR(15),
+    paper_id INT NOT NULL,
+    FOREIGN KEY (product_type_id) references ProductTypeTable(id)
+);
+DROP TABLE id_barcode;
 
 DROP TABLE SingleOutProductTable;
 DROP TABLE FactTable;

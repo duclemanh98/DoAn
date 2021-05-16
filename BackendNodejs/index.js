@@ -132,7 +132,9 @@ app.post('/inPaperCreate', function(req, res){
     //let created_at = new Date(req.body.year, req.body.month - 1, req.body.date);
     //let created_at = new Date(2021, 00, 31);
     //console.log(created_at);
-    pool.query("CALL create_in_paper_wo_date(?)", [req.body.store], function(err){
+    var dateObject = date_convert(req.body.created_time);
+    console.log(req.body);
+    pool.query("CALL create_in_paper_with_date(?,?,?)", [req.body.store, dateObject, req.body.description], function(err){
         if(err) return res.json(0);
         pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
             if(err) throw err;
@@ -151,8 +153,8 @@ app.post('/inPaperCreate', function(req, res){
  *  @retval: true or false
  */
 app.post('/addInProduct', async(req, res) => {
-    console.log(req.body.paper_id);
-
+    //console.log(req.body.paper_id);
+    // console.log(req.body);
     var prodFile = JSON.parse(JSON.stringify(req.body.product_info));
     //console.log(product_file);
     console.log(prodFile);
@@ -224,7 +226,7 @@ app.post('/displayAllInPaper', function(req, res){
  *  scan_number         ---- number of scanned box
  */
 app.post('/getDetailInPaper', function(req, res) {
-    // console.log(req.body);
+    console.log(req.body);
     console.log("Get detail of paper " + req.body.id);
     pool.query('CALL in_paper_detail(?)', [req.body.id], function(err, rows){
         if(err) throw err;
@@ -241,7 +243,16 @@ app.post('/getDetailInPaper', function(req, res) {
  *  paperID             ---- id of paper of product
  *
  * 
- *  @retval: true or false
+ *  @retval: object includes:
+ *  type_id:            ---- product type
+ *  cur_name:           ---- name of product
+ *  perbox:         ---- number of product / box
+ *  location_id:        ---- id of location position
+ *  building:           ---- building contain current location
+ *  building_floor :    ---- floor of current building
+ *  room:               ---- 
+ *  rack:               ----
+ *  rack_bin:           ----
  *  
  */
 app.post('/addInScanProduct', function(req, res) {
@@ -251,11 +262,42 @@ app.post('/addInScanProduct', function(req, res) {
     if(req.body.productID==''||req.body.typeID==''||req.body.paperID=='') return;
     pool.query('CALL add_in_scanned_product(?,?,?)', [product_id, req.body.typeID, req.body.paperID], function(err){
         if(err) throw err;
-        pool.query('CALL search_with_product_id(?)', [product_id], function(err, rows){
-            console.log(rows[0]);
+        pool.query('CALL assign_location_in_product(?)', [product_id], function(err){
             if(err) throw err;
-            res.send(JSON.parse(JSON.stringify(rows[0])));
+            pool.query('CALL search_with_product_id(?)', [product_id], function(err, rows){
+                if(err) throw err;
+                console.log(rows[0]);
+                res.send(JSON.parse(JSON.stringify(rows[0])));
+            })
         })
+    })
+})
+
+/*
+ *  '/displayInScannedProduct'
+ *  @brief: API to show specific in paper
+ *  req includes:
+ *  paperID             ---- id of paper of product
+ *
+ * 
+ *  @retval: object includes:
+ *  type_id:            ---- product type
+ *  cur_name:           ---- name of product
+ *  perbox:         ---- number of product / box
+ *  location_id:        ---- id of location position
+ *  building:           ---- building contain current location
+ *  building_floor :    ---- floor of current building
+ *  room:               ---- 
+ *  rack:               ----
+ *  rack_bin:           ----
+ *  
+ */
+app.post('/displayInScannedProduct', function(req, res){
+    //console.log(req.body);
+    console.log("Display scanned products of paper "+req.body.paperID);
+    pool.query('CALL search_scanned_product(?)', [req.body.paperID], function(err, rows){
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
     })
 })
 

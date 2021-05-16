@@ -213,10 +213,25 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS search_with_product_id;
 CREATE PROCEDURE search_with_product_id(IN product_id INT)
 BEGIN
-	SELECT ProductTypeTable.cur_name, ProductTypeTable.max_amount, LocationTable.id, building, building_floor, room, rack, rack_bin
+	SELECT ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, LocationTable.id AS location_id, building, building_floor, room, rack, rack_bin
     FROM FactTable
     JOIN LocationTable ON FactTable.location_id = LocationTable.id
     JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
     WHERE FactTable.id = product_id;
 END &&
 DELIMITER ;
+#--------------------------------------
+#### Search product detail according to product_id
+DELIMITER &&
+DROP PROCEDURE IF EXISTS search_scanned_product;
+CREATE PROCEDURE search_scanned_product(IN paper_id INT)
+BEGIN
+	SELECT ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, LocationTable.id AS location_id, building, building_floor, room, rack, rack_bin
+    FROM FactTable
+    JOIN LocationTable ON FactTable.location_id = LocationTable.id
+    JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
+    WHERE FactTable.in_paper_id = paper_id;
+END &&
+DELIMITER ;
+
+#---

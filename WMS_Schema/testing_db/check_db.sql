@@ -39,3 +39,5 @@ CALL search_location_with_product_id(2);
 SELECT * FROM FactTable;
 SELECT * FROM ProductTypeTable WHERE id = 'RB14016';
 CALL search_with_product_id(4);
+
+CALL create_in_paper_with_date('A','2021-08-09','');
