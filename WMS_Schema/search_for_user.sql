@@ -8,11 +8,11 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS show_total_product_warehouse;
 CREATE PROCEDURE show_total_product_warehouse()
 BEGIN
-	SELECT FactTable.product_type_id, ProductTypeTable.cur_name, SUM(FactTable.amount) AS total_amount
-    FROM FactTable
-	JOIN ProductTypeTable
+	SELECT ProductTypeTable.id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, IFNULL(SUM(FactTable.amount),0) AS total_amount
+    FROM ProductTypeTable
+	LEFT JOIN FactTable
 		ON FactTable.product_type_id = ProductTypeTable.id
-	GROUP BY FactTable.product_type_id;
+	GROUP BY ProductTypeTable.id;
 END &&
 DELIMITER ;
 #---------------------------------------
@@ -234,4 +234,5 @@ BEGIN
 END &&
 DELIMITER ;
 
-#---
+#-----------------------------------------------
+##### Search product left in 

@@ -17,12 +17,57 @@ BEGIN
 END &&
 DELIMITER ;
 #------------------------------------------
+DELIMITER &&
+DROP PROCEDURE IF EXISTS check_amount_out_product;
+CREATE PROCEDURE check_amount_out_product(IN product_type VARCHAR(15), IN selected_amount INT, OUT check_val TINYINT)
+BEGIN
+	DECLARE warehouse_amount INT;
+    SELECT SUM(amount) INTO warehouse_amount FROM FactTable
+    WHERE product_type = FactTable.product_type_id
+    GROUP BY product_type_id;
+    
+    IF warehouse_amount < selected_amount THEN
+		SET check_val = 0;
+	ELSE
+		SET check_val = 1;
+	END IF;
+END &&
+DELIMITER ;
+
+#------------------------------------------
 ### Insert 1 product type (total) into out paper / admin uses when creating paper
 DELIMITER &&
 DROP PROCEDURE IF EXISTS add_product_type_out_paper;
-CREATE PROCEDURE add_product_type_out_paper(IN paper INT, IN product_type VARCHAR(15), IN amount INT)
+CREATE PROCEDURE add_product_type_out_paper(IN paper INT, IN product_type VARCHAR(15), IN out_amount INT)
 BEGIN
-	INSERT INTO TotalOutProductTable(id, paper_id, amount) VALUES (product_type, paper, amount);
+	###Variable storing temp amount of current product
+	DECLARE temp_amount INT;			#store amount of current product
+    DECLARE saved_amount INT;			#store amount of current selected product
+    DECLARE saved_id INT DEFAULT 0;		#store id of current selected product
+    
+    ###Update TotalOutProductTable
+	INSERT INTO TotalOutProductTable(id, paper_id, amount) VALUES (product_type, paper, out_amount);
+    SET temp_amount = out_amount;
+    
+    ###Update SingleOutProductTable
+    SingleProdUpdate: LOOP
+		SELECT id, amount INTO saved_id, saved_amount FROM FactTable
+        WHERE product_type = FactTable.product_type_id AND FactTable.id > saved_id AND FactTable.amount > 0
+        ORDER BY in_paper_id ASC LIMIT 1;
+        
+        IF temp_amount > saved_amount THEN
+			INSERT INTO SingleOutProductTable(id, amount, paper_id) VALUES (saved_id, saved_amount, paper);
+            SET temp_amount = temp_amount - saved_amount;
+		ELSE 
+			INSERT INTO SingleOutProductTable(id, amount, paper_id) VALUES (saved_id, temp_amount, paper);
+            SET temp_amount = 0;
+		END IF;
+       
+        IF temp_amount > 0 THEN
+			ITERATE SingleProdUpdate;
+		END IF;
+		LEAVE SingleProdUpdate;
+	END LOOP SingleProdUpdate;
 END &&
 DELIMITER ;
 #----------------------------------------------------------
@@ -58,6 +103,7 @@ END &&
 DELIMITER ;
 #---------------------------------------------------------
 ### Add product from location into SingleOutProduct / use after calculate the requested product an location for worker
+### Deprecated
 DELIMITER &&
 DROP PROCEDURE IF EXISTS add_single_out_product;
 CREATE PROCEDURE add_single_out_product(IN location INT, IN amount INT, IN paper INT, IN product_type VARCHAR(15))
@@ -77,7 +123,7 @@ BEGIN
 END &&
 DELIMITER ;
 #---------------------------------------------------------
-### Scan in 1 out Product / use when user actually scan out 1 paper from paper
+### Scan in 1 out Product / use when user actually scan out 1 product from paper
 DELIMITER &&
 DROP PROCEDURE IF EXISTS scan_out_product;
 CREATE PROCEDURE scan_out_product(IN product_id INT, IN select_amount INT, IN out_paper INT, IN product_type VARCHAR(15))
@@ -126,4 +172,18 @@ BEGIN
 	END IF;
 END &&
 DELIMITER ;
-#---------------
+#--------------------------------
+#### Procedure to check if current location have enough products
+DELIMITER &&
+DROP PROCEDURE IF EXISTS check_location_product_amount;
+CREATE PROCEDURE check_location_product_amount(IN product_id INT, IN selected_amount INT, OUT check_val TINYINT)
+BEGIN
+	DECLARE current_amount INT;
+    SELECT amount INTO current_amount FROM FactTable WHERE FactTable.id = product_id;
+    IF current_amount < selected_amount THEN
+		SET check_val = 0;
+	ELSE
+		SET check_val = 1;
+	END IF;
+END &&
+DELIMITER ;

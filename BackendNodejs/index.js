@@ -308,13 +308,39 @@ app.post('/displayInScannedProduct', function(req, res){
  *  paperID:    ID of in paper
  *
  * 
- *  @retval: true or false
+ *  @retval: value: 'p': pending or 'c': complete
  */
 app.post('/confirmInScanPaper', function(req, res){
-    console.log(req.body.paperID);
-    pool.query('CALL complete_in_paper(?)', [req.body.paperID], function(err, rows){
-        if(err) return res.json(false);
-        return res.json(true);
+    console.log("Confirm in paper "+req.body.paperID);
+    pool.query('CALL complete_in_paper(?)', [req.body.paperID], function(err){
+        if(err) throw err;
+        pool.query('SELECT cur_status FROM InPaperTable WHERE id = ?',[req.body.paperID], function(err, rows) {
+            if(err) throw err;
+            res.send(rows);
+        })
+    })
+})
+
+//--------------------------------------------------------------------
+//---------------************************************-----------------
+//--------------- API used for Outward Product -----------------------
+
+
+/*
+ *  '/displayProductLeft'
+ *  @brief: API to confirm a paper
+ * 
+ *  @retval:
+ *  type_id:            type of product code
+ *  cur_name:           name of product
+ *  perbox:             number of products per box
+ *  total_amount:       amount of product left in warehouse
+ */
+app.post('/displayProductLeft', function(req, res) {
+    console.log("Get product type and number left in warehouse");
+    pool.query('CALL show_total_product_warehouse()', function(err, rows) {
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
     })
 })
 

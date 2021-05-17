@@ -41,3 +41,20 @@ SELECT * FROM ProductTypeTable WHERE id = 'RB14016';
 CALL search_with_product_id(4);
 
 CALL create_in_paper_with_date('A','2021-08-09','');
+
+
+SELECT * FROM OutPaperTable;
+SELECT * FROM TotalOutProductTable;
+SELECT * FROM SingleOutProductTable;
+SELECT * FROM FactTable;
+## TEst out product
+CALL create_out_paper_wo_date('Buyer A');
+CALL add_product_type_out_paper(1, 'RB110', 30);
+
+CALL scan_out_product(2,10,1,'RB110');
+SELECT * FROM LocationTable WHERE bin_status != 'free';
+
+CALL complete_out_paper(1);
+     
+CALL show_total_product_warehouse();
+
