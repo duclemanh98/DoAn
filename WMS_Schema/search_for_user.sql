@@ -8,7 +8,7 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS show_total_product_warehouse;
 CREATE PROCEDURE show_total_product_warehouse()
 BEGIN
-	SELECT ProductTypeTable.id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, IFNULL(SUM(FactTable.amount),0) AS total_amount
+	SELECT ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, IFNULL(SUM(FactTable.amount),0) AS total_amount
     FROM ProductTypeTable
 	LEFT JOIN FactTable
 		ON FactTable.product_type_id = ProductTypeTable.id

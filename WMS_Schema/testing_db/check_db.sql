@@ -57,4 +57,5 @@ SELECT * FROM LocationTable WHERE bin_status != 'free';
 CALL complete_out_paper(1);
      
 CALL show_total_product_warehouse();
+CALL out_paper_detail(1);
 

@@ -226,8 +226,7 @@ app.post('/displayAllInPaper', function(req, res){
  *  scan_number         ---- number of scanned box
  */
 app.post('/getDetailInPaper', function(req, res) {
-    console.log(req.body);
-    console.log("Get detail of paper " + req.body.id);
+    console.log("Get detail of in paper " + req.body.id);
     pool.query('CALL in_paper_detail(?)', [req.body.id], function(err, rows){
         if(err) throw err;
         res.send(JSON.parse(JSON.stringify(rows[0])));
@@ -339,6 +338,102 @@ app.post('/confirmInScanPaper', function(req, res){
 app.post('/displayProductLeft', function(req, res) {
     console.log("Get product type and number left in warehouse");
     pool.query('CALL show_total_product_warehouse()', function(err, rows) {
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
+    })
+})
+
+/*
+ *  '/createOutPaper'
+ *  @brief: API to create Outward paper
+ *  req: 
+ *  createDate:             ---date created
+ *  buyer:                  ---buyer of product
+ * 
+ *  @retval:
+ *  paper_id:               ---ID of paper
+ */
+app.post('/createOutPaper', function(req, res){
+    var dateObject = date_convert(req.body.createDate);
+    console.log(req.body);
+    pool.query("CALL create_out_paper_with_date(?,?)", [req.body.buyer, dateObject], function(err){
+        if(err) return res.json(0);
+        pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
+            if(err) throw err;
+            return res.json(rows[0].paper_id);
+        })
+    })
+})
+
+/*
+ *  '/addOutProduct'
+ *  @brief: API when add 1 product to specific in paper
+ *  request: json file include:
+ *  + paper_id
+ *  + product_info: {type_id, cur_name, amount}
+ *  @retval: true or false
+ */
+app.post('/addOutProduct', async(req, res) => {
+    console.log("Add out product");
+    console.log(req.body.paper_id);
+    var prodFile = JSON.parse(JSON.stringify(req.body.product_info));
+    //console.log(product_file);
+    console.log(prodFile);
+    
+    var length = Object.keys(req.body.product_info).length;
+
+    for(var i=0;i<length;i++) {
+        pool.query('CALL add_product_type_out_paper(?,?,?)',[req.body.paper_id, prodFile[i].productID, prodFile[i].productQuantity], function(err, results){
+            if(err) return res.json(false);
+        })
+    }
+    return res.json(true);
+})
+
+
+/*******---------------------------*********/
+/****----API for Searching Out Paper-----****/
+
+/*
+ *  '/displayAllOutPaper'
+ *  @brief: API to show all out paper
+ *
+ * 
+ *  @retval: object contain all info about date
+ *  id                      --id of paper
+ *  buyer                   --supplier
+ *  created_at              --date that paper is created
+ *  cur_status              --status of paper
+ */
+
+app.post('/displayAllOutPaper', function(req, res){
+    console.log("Display all out paper");
+    pool.query('SELECT * FROM OutPaperTable', function(err, rows){
+        if(err) throw err;
+        for(var i = 0; i < rows.length; i++){
+            rows[i].created_at = rows[i].created_at.split(' ')[0];
+        }
+        res.send(JSON.parse(JSON.stringify(rows)));
+    })
+})
+
+/*
+ *  '/getDetailOutPaper'
+ *  @brief: API to show specific out paper
+ *  req includes: paperID --- id of paper
+ *
+ * 
+ *  @retval: object contain all info about product in paper
+ *  id                  ---- id of product
+ *  cur_name            ---- name of product
+ *  perbox              ---- number of product per box
+ *  amount              ---- number of boxes of product in current paper
+ *  selected_amount     ---- number of scanned box
+ */
+app.post('/getDetailOutPaper', function(req, res) {
+    //console.log(req.body);
+    console.log("Get detail of out paper " + req.body.paperID);
+    pool.query('CALL out_paper_detail(?)', [req.body.paperID], function(err, rows){
         if(err) throw err;
         res.send(JSON.parse(JSON.stringify(rows[0])));
     })
