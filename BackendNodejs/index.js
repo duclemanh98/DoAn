@@ -63,6 +63,29 @@ function date_convert(date_arr) {
     return dateObject;
 }
 
+/*
+ *  This function will update scanned data to server
+ *  @param:     productInfo:
+ *                  boxID:      --- ID of product
+ *                  typeID:     --- ID of type code
+ *                  amount:     --- number of products selected
+ *                  status:     --- pending (p) or complete (c)
+ *  @retval:    none
+ */
+function addOutScanProduct(productInfo, paperID) {
+    return new Promise(resolve =>{
+        for(var i = 0; i < productInfo.length; i++) {
+            if(productInfo.status == 'p') {
+                pool.query('CALL scan_out_product(?,?,?,?)', [productInfo.boxID, productInfo.amount, paperID, productInfo.typeID], function(err, rows){
+                    if(err) throw err;
+                    console.log(productnfo[i]);
+                })
+            }
+        }
+        resolve('resolved');
+    })
+}
+
 //----------------------------------------------------------------------------------------//
 /*
                         API for backend
@@ -235,7 +258,7 @@ app.post('/getDetailInPaper', function(req, res) {
 
 /*
  *  '/addInScanProduct'
- *  @brief: API to show specific in paper
+ *  @brief: API add 1 scan product to in paper
  *  req includes:
  *  productID:          ---- specific id of product
  *  typeID              ---- type code of product
@@ -436,6 +459,61 @@ app.post('/getDetailOutPaper', function(req, res) {
     pool.query('CALL out_paper_detail(?)', [req.body.paperID], function(err, rows){
         if(err) throw err;
         res.send(JSON.parse(JSON.stringify(rows[0])));
+    })
+})
+
+/*
+ *  '/displayOutScannedProduct'
+ *  @brief: API to show specific in paper
+ *  req includes:
+ *  paperID             ---- id of paper of product
+ *
+ * 
+ *  @retval: object includes:
+ *  product_id:         ---- id of product
+ *  type_id:            ---- product type
+ *  cur_name:           ---- name of product
+ *  perbox:             ---- amount of product/box
+ *  amount:             ---- required amount to be taken from location
+ *  location_id:        ---- id of location position
+ *  building:           ---- building contain current location
+ *  building_floor :    ---- floor of current building
+ *  room:               ---- 
+ *  rack:               ----
+ *  rack_bin:           ----
+ *  cur_status:          ---- display if product is taken or not
+ */
+app.post('/displayOutScannedProduct', function(req, res){
+    if(req.body.paperID == '') return;
+    console.log("Display scanned product of out paper "+req.body.paperID);
+    pool.query('CALL show_out_paper_scan_product(?)', [req.body.paperID], function(err, rows){
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
+    })
+})
+
+/*
+ *  '/confirmOutScanProduct'
+ *  @brief: API to add 1 scanned out product
+ *  req includes:
+ *  paperID             ---- id of paper of product
+ *  productInfo:
+ *      productID:          ---- specific id of product
+ *      typeID              ---- type code of product
+ *      amount:             ---- selected amount of product
+ *      cur_status:         ---- check if product is scanned or not
+ * 
+ *  @retval: true/false
+ *  
+ */
+
+app.post('/confirmOutScanProduct', async(res, req) => {
+    console.log("Confirm out paper "+res.body.paperID);
+
+    await addOutScanProduct(res.body.productInfo, res.body.paperID);
+
+    pool.query('CALL complete_out_paper(?)', [res.body.paperID], function(err) {
+        if(err) throw err;
     })
 })
 

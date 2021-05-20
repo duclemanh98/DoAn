@@ -105,3 +105,22 @@ BEGIN
 	SELECT * FROM outPaperTable WHERE id = in_paper_id;
 END &&
 DELIMITER ;
+
+#-----------------------------------------------
+### Use to search scanned product of out product from paperID
+DELIMITER &&
+DROP PROCEDURE IF EXISTS show_out_paper_scan_product;
+CREATE PROCEDURE show_out_paper_scan_product(IN paper INT)
+BEGIN
+	SELECT FactTable.id AS product_id, FactTable.product_type_id AS type_id, ProductTypeTable.cur_name,
+		   ProductTypeTable.max_amount AS perbox,
+		   SingleOutProductTable.amount, FactTable.location_id, LocationTable.building, LocationTable.building_floor,
+           LocationTable.room, LocationTable.rack, LocationTable.rack_bin, SingleOutProductTable.cur_status
+    FROM FactTable
+    JOIN SingleOutProductTable ON FactTable.id = SingleOutProductTable.id
+    JOIN LocationTable ON FactTable.location_id = LocationTable.id
+    JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
+    WHERE SingleOutProductTable.paper_id = paper
+    ORDER BY LocationTable.id;
+END &&
+DELIMITER ;
