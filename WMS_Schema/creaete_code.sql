@@ -45,3 +45,14 @@ CALL create_out_paper_wo_date('Khách hàng A');
 
 CALL add_product_type_out_paper(1, 'RB110', 30);
 CALL add_product_type_out_paper(1, 'RDB75', 60);
+
+SELECT * FROM id_barcode;
+#### Create barcode
+CALL add_bar_code('RDKTC9020', 2, 3);
+CALL add_bar_code('RV40', 2, 5);
+CALL add_bar_code('RZC2510', 2, 4);
+
+CALL add_bar_code('RB110', 3, 3);
+CALL add_bar_code('RDKTC9040', 3, 4);
+CALL add_bar_code('RVC32', 3, 5);
+

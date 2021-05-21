@@ -65,3 +65,6 @@ CALL scan_out_product(2, 10, 4, 'RB110');
 CALL in_paper_detail(1);
 
 CALL search_with_product_id(1);
+CALL search_scanned_product(1);
+
+CALL search_scanned_product(1);

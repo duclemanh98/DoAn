@@ -6,13 +6,14 @@
 ### Show total product in warehouse
 DELIMITER &&
 DROP PROCEDURE IF EXISTS show_total_product_warehouse;
-CREATE PROCEDURE show_total_product_warehouse()
+CREATE PROCEDURE show_total_product_warehouse(IN keyword VARCHAR(100))
 BEGIN
-	SELECT ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, IFNULL(SUM(FactTable.amount),0) AS total_amount
+	SELECT ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, SUM(FactTable.amount) AS total_amount
     FROM ProductTypeTable
 	LEFT JOIN FactTable
 		ON FactTable.product_type_id = ProductTypeTable.id
-	GROUP BY ProductTypeTable.id;
+	WHERE ISNULL(FactTable.amount) = 0 AND FactTable.amount != 0  AND ProductTypeTable.cur_name LIKE CONCAT("%", keyword, "%")
+    GROUP BY ProductTypeTable.id;
 END &&
 DELIMITER ;
 #---------------------------------------
@@ -213,7 +214,7 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS search_with_product_id;
 CREATE PROCEDURE search_with_product_id(IN product_id INT)
 BEGIN
-	SELECT ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, LocationTable.id AS location_id, building, building_floor, room, rack, rack_bin
+	SELECT FactTable.id AS product_id, ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, LocationTable.id AS location_id, building, building_floor, room, rack, rack_bin
     FROM FactTable
     JOIN LocationTable ON FactTable.old_location = LocationTable.id
     JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
@@ -226,13 +227,45 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS search_scanned_product;
 CREATE PROCEDURE search_scanned_product(IN paper_id INT)
 BEGIN
-	SELECT ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, LocationTable.id AS location_id, building, building_floor, room, rack, rack_bin
+	SELECT FactTable.id AS product_id, ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox, LocationTable.id AS location_id, building, building_floor, room, rack, rack_bin
     FROM FactTable
-    JOIN LocationTable ON FactTable.location_id = LocationTable.id
+    JOIN LocationTable ON FactTable.old_location = LocationTable.id
     JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
     WHERE FactTable.in_paper_id = paper_id;
 END &&
 DELIMITER ;
 
 #-----------------------------------------------
-##### Search product left in 
+##### Search Out, In Product from 2 dates and Current amount of products in date
+DELIMITER &&
+DROP PROCEDURE IF EXISTS search_inout_product;
+CREATE PROCEDURE search_inout_product(IN first_date DATETIME, IN last_date DATETIME, IN keyword VARCHAR(100))
+BEGIN
+	DROP TEMPORARY TABLE IF EXISTS TempInProd;
+    CREATE TEMPORARY TABLE TempInProd AS (
+		SELECT InProductTable.id, SUM(InProductTable.box_amount) AS in_amount 
+        FROM InProductTable
+        JOIN InPaperTable ON InProductTable.paper_id = InPaperTable.id
+        WHERE InPaperTable.created_at BETWEEN first_date AND last_date
+        GROUP BY InProductTable.id
+    );
+    
+    DROP TEMPORARY TABLE IF EXISTS TempOutProd;
+    CREATE TEMPORARY TABLE TempOutProd AS (
+		SELECT TotalOutProductTable.id, SUM(TotalOutProductTable.amount) AS out_amount 
+        FROM TotalOutProductTable
+        JOIN OutPaperTable ON TotalOutProductTable.paper_id = OutPaperTable.id
+        WHERE OutPaperTable.created_at BETWEEN first_date AND last_date
+        GROUP BY TotalOutProductTable.id
+    );
+    
+    SELECT ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox,
+		   IFNULL(TempInProd.in_amount,0) AS in_number, IFNULL(TempOutProd.out_amount,0) AS out_number
+    FROM ProductTypeTable
+    LEFT JOIN TempInProd ON ProductTypeTable.id = TempInProd.id
+    LEFT JOIN TempOutProd ON ProductTypeTable.id = TempOutProd.id
+    WHERE (IFNULL(TempInProd.in_amount,0)+IFNULL(TempOutProd.out_amount,0))!=0 
+		  AND ((ProductTypeTable.cur_name = keyword) OR (ProductTypeTable.cur_name LIKE CONCAT("%", keyword, "%")))
+    ORDER BY in_number DESC, out_number DESC;
+END &&
+DELIMITER ;

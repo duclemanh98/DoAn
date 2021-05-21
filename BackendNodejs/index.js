@@ -57,7 +57,7 @@ function check_duplicate(json_obj) {
  */
 function date_convert(date_arr) {
     var dateParts = date_arr.split("/");
-    console.log(dateParts);
+    //console.log(dateParts);
 
     var dateObject = new Date(+dateParts[2], dateParts[1] - 1, +dateParts[0]);
     return dateObject;
@@ -204,7 +204,7 @@ app.post('/addInProduct', async(req, res) => {
 
 app.post('/getProductType', function(req, res) {
     console.log("Get product type");
-    pool.query('SELECT no_id, cur_name, max_amount FROM ProductTypeTable', function(err, result){
+    pool.query('SELECT id AS type_id, cur_name, max_amount FROM ProductTypeTable', function(err, result){
         if(err) throw err;
         //console.log(result);
         res.send(JSON.parse(JSON.stringify(result)));
@@ -283,7 +283,10 @@ app.post('/addInScanProduct', function(req, res) {
     var product_id = parseInt(req.body.productID);
     if(req.body.productID==''||req.body.typeID==''||req.body.paperID=='') return;
     pool.query('CALL add_in_scanned_product(?,?,?)', [product_id, req.body.typeID, req.body.paperID], function(err){
-        if(err) throw err;
+        if(err) {
+            console.log("Error in current input product");
+            return;
+        }
         pool.query('CALL assign_location_in_product(?)', [product_id], function(err){
             if(err) throw err;
             pool.query('CALL search_with_product_id(?)', [product_id], function(err, rows){
@@ -318,7 +321,7 @@ app.post('/displayInScannedProduct', function(req, res){
     //console.log(req.body);
     console.log("Display scanned products of paper "+req.body.paperID);
     pool.query('CALL search_scanned_product(?)', [req.body.paperID], function(err, rows){
-        if(err) throw err;
+        if(err) return;
         res.send(JSON.parse(JSON.stringify(rows[0])));
     })
 })
@@ -508,13 +511,89 @@ app.post('/displayOutScannedProduct', function(req, res){
  *  
  */
 
-app.post('/confirmOutScanProduct', async(res, req) => {
-    console.log("Confirm out paper "+res.body.paperID);
-    var prodFile = res.body.productInfo;
-    for(var i = 0; i < res.body.productInfo.length; i++) {
-        pool.query('CALL scan_out_product(?,?,?,?)', [prodFile[i].productID, prodFile[i].amount, res.body.paperID, prodFile[i].typeID], function(err) {
+app.post('/confirmOutScanProduct', async(req, res) => {
+    console.log("Confirm out paper "+req.body.paperID);
+    var prodFile = req.body.productInfo;
+    for(var i = 0; i < req.body.productInfo.length; i++) {
+        pool.query('CALL scan_out_product(?,?,?,?)', [prodFile[i].productID, prodFile[i].amount, req.body.paperID, prodFile[i].typeID], function(err) {
             if(err) throw err;
         }) 
+    }
+})
+
+
+/*******---------------------------*********/
+/****----API for Warehouse Report-----****/
+
+/*
+ *  '/searchImportExport'
+ *  @brief: API to show import and export of products inside warehouse
+ *  req includes 2 dates to search
+ *  firstDate:            ---- 
+ *  lastDate:
+ *  keyword:
+ * 
+ *  @retval:
+ *  type_id:            ---- id code of product type
+ *  cur_name:           ---- name of product
+ *  perbox:             ---- number of products / box
+ *  in_number:          ---- number of in boxes
+ *  out_number:         ---- number of out products
+ *  
+ */
+app.post('/searchImportExport', function(req, res) {
+    console.log("Searching import and export amount between "+ req.body.firstDate + " and " + req.body.lastDate);
+    var first_date, last_date;
+    if(req.body.firstDate == '') {
+        first_date = date_convert('01/01/0000');
+    } 
+    else first_date = date_convert(req.body.firstDate);
+
+    if(req.body.lastDate == '') {
+        last_date = date_convert('31/12/2099');
+    }
+    else last_date = date_convert(req.body.lastDate);
+    // var first_date = date_convert(req.body.firstDate);
+    // var last_date = date_convert(req.body.lastDate);
+    if(req.body.keyword == '') {
+        pool.query('CALL search_inout_product(?,?,?)', [first_date, last_date, req.body.keyword], function(err, rows){
+            if(err) throw err;
+            res.send(JSON.parse(JSON.stringify(rows[0])));
+        })
+    }
+    else {
+        pool.query('CALL search_inout_product(?,?,?)', [first_date, last_date, req.body.keyword.name], function(err, rows){
+            if(err) throw err;
+            res.send(JSON.parse(JSON.stringify(rows[0])));
+        })
+    } 
+})
+
+
+/*
+ *  '/searchWarehouseProduct'
+ *  @brief: API to show number products inside warehouse
+ *  keyword:            ---- name of product or ''
+ * 
+ *  @retval:
+ *  type_id:            ---- id code of product type
+ *  cur_name:           ---- name of product
+ *  total_amount:       ---- number of selected products in warehouse
+ *  
+ */
+app.post('/searchWarehouseProduct', function(req, res) {
+    console.log("Searching number of product left in warehouse");
+    if(!req.body.keyword) {
+        pool.query('CALL show_total_product_warehouse(?)', [''], function(err, rows){
+            if(err) throw err;
+            res.send(JSON.parse(JSON.stringify(rows[0])));
+        })
+    }
+    else {
+        pool.query('CALL show_total_product_warehouse(?)', [req.body.keyword], function(err, rows){
+            if(err) throw err;
+            res.send(JSON.parse(JSON.stringify(rows[0])));
+        })
     }
 })
 
