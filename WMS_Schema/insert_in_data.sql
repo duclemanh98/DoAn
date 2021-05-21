@@ -176,6 +176,7 @@ BEGIN
     
     UPDATE LocationTable SET bin_status = 'occu' WHERE id = id_location;
     UPDATE FactTable SET FactTable.location_id = id_location WHERE FactTable.id = product_id;
+    UPDATE FactTable SET FactTable.old_location = id_location WHERE FactTable.id = product_id;
     
     SELECT id FROM LocationTable WHERE id = id_location;
 END &&

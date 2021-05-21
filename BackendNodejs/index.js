@@ -72,19 +72,19 @@ function date_convert(date_arr) {
  *                  status:     --- pending (p) or complete (c)
  *  @retval:    none
  */
-function addOutScanProduct(productInfo, paperID) {
-    return new Promise(resolve =>{
-        for(var i = 0; i < productInfo.length; i++) {
-            if(productInfo.status == 'p') {
-                pool.query('CALL scan_out_product(?,?,?,?)', [productInfo.boxID, productInfo.amount, paperID, productInfo.typeID], function(err, rows){
-                    if(err) throw err;
-                    console.log(productnfo[i]);
-                })
-            }
-        }
-        resolve('resolved');
-    })
-}
+// async function addOutScanProduct(productInfo, paperID) {
+//     return new Promise(resolve =>{
+//         var i;
+//         for(i = 0; i < productInfo.length; i++) {
+//             if(productInfo.status == 'c') {
+//                 pool.query('CALL scan_out_product(?,?,?,?',[perProductInfo.boxID, perProductInfo.amount, paperID, perProductInfo.typeID], function(err){
+//                     if(err) throw err;
+//                     resolve('done');
+//                 })
+//             }
+//         }
+//     })
+// }
 
 //----------------------------------------------------------------------------------------//
 /*
@@ -486,6 +486,7 @@ app.post('/getDetailOutPaper', function(req, res) {
 app.post('/displayOutScannedProduct', function(req, res){
     if(req.body.paperID == '') return;
     console.log("Display scanned product of out paper "+req.body.paperID);
+
     pool.query('CALL show_out_paper_scan_product(?)', [req.body.paperID], function(err, rows){
         if(err) throw err;
         res.send(JSON.parse(JSON.stringify(rows[0])));
@@ -509,12 +510,12 @@ app.post('/displayOutScannedProduct', function(req, res){
 
 app.post('/confirmOutScanProduct', async(res, req) => {
     console.log("Confirm out paper "+res.body.paperID);
-
-    await addOutScanProduct(res.body.productInfo, res.body.paperID);
-
-    pool.query('CALL complete_out_paper(?)', [res.body.paperID], function(err) {
-        if(err) throw err;
-    })
+    var prodFile = res.body.productInfo;
+    for(var i = 0; i < res.body.productInfo.length; i++) {
+        pool.query('CALL scan_out_product(?,?,?,?)', [prodFile[i].productID, prodFile[i].amount, res.body.paperID, prodFile[i].typeID], function(err) {
+            if(err) throw err;
+        }) 
+    }
 })
 
 /*

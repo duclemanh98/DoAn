@@ -84,9 +84,11 @@ CREATE TABLE FactTable(
     amount INT NOT NULL,
     location_id INT DEFAULT NULL,
     product_type_id VARCHAR(15) NOT NULL,
+    old_location INT DEFAULT NULL,
     FOREIGN KEY (in_paper_id) REFERENCES InPaperTable(id),
     FOREIGN KEY (location_id) REFERENCES LocationTable(id),
-    FOREIGN KEY (product_type_id) REFERENCES ProductTypeTable(id)
+    FOREIGN KEY (product_type_id) REFERENCES ProductTypeTable(id),
+    FOREIGN KEY (old_location) REFERENCES LocationTable(id)
 );
 #DROP TABLE SingleOutProductTable;
 CREATE TABLE SingleOutProductTable (
@@ -117,3 +119,23 @@ DROP TABLE InPaperTable;
 DROP TABLE ProductTypeAnalysis;
 DROP TABLE ProductTypeTable;
 DROP TABLE LocationTable;
+
+UPDATE LocationTable SET bin_status = 'free' WHERE bin_status != 'free';
+
+####-----------------------------------
+## Function to create barcode for product
+DELIMITER &&
+DROP PROCEDURE IF EXISTS add_bar_code;
+CREATE PROCEDURE add_bar_code(IN typeID VARCHAR(15), IN paper INT, IN amount INT)
+BEGIN 
+	loop_label: LOOP
+		IF amount = 0 THEN
+			LEAVE loop_label;
+		END IF;
+        
+        INSERT INTO id_barcode(product_type_id, paper_id) VALUES (typeID, paper);
+		SET amount = amount - 1;
+        ITERATE loop_label;
+	END LOOP;
+END &&
+DELIMITER ;

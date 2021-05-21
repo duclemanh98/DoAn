@@ -184,6 +184,7 @@ BEGIN
 			UPDATE LocationTable SET bin_status = 'occu' WHERE LocationTable.id = location;
 		END IF;
 	END IF;
+    CALL complete_out_paper(out_paper);
 END &&
 DELIMITER ;
 #--------------------------------
