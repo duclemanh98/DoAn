@@ -56,7 +56,7 @@ SELECT * FROM LocationTable WHERE bin_status != 'free';
 
 CALL complete_out_paper(1);
      
-CALL show_total_product_warehouse();
+CALL show_total_product_warehouse('Bích nối ống phun PPR DN 110 PN20');
 CALL out_paper_detail(4);
 CALL show_out_paper_scan_product(4);
 CALL show_out_paper_scan_product(1);
@@ -68,3 +68,10 @@ CALL search_with_product_id(1);
 CALL search_scanned_product(1);
 
 CALL search_scanned_product(1);
+
+CALL show_total_product_warehouse('');
+
+CALL show_products_according_location('I', 1, 1);
+
+SELECT * FROM InventoryCheckingPaperTable;
+SELECT * FROM InventoryCheckingProductTable;

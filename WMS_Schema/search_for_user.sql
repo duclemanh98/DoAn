@@ -36,16 +36,15 @@ DELIMITER ;
 ### Searching product according to location
 DELIMITER &&
 DROP PROCEDURE IF EXISTS show_products_according_location;
-CREATE PROCEDURE show_products_according_location (IN sel_building INT, IN sel_floor INT, IN sel_room INT)
+CREATE PROCEDURE show_products_according_location (IN sel_building CHAR(1), IN sel_floor INT, IN sel_room INT)
 BEGIN
-	SELECT FactTable.product_type_id, ProductTypeTable.cur_name, SUM(amount) AS total_amount
+	SELECT FactTable.id, FactTable.product_type_id, ProductTypeTable.cur_name, FactTable.location_id, FactTable.amount
     FROM FactTable
 	JOIN ProductTypeTable
 		ON FactTable.product_type_id = ProductTypeTable.id
 	JOIN LocationTable
 		ON FactTable.location_id = LocationTable.id
-	WHERE LocationTable.building = sel_building AND LocationTable.building_floor = sel_floor AND LocationTable.room = sel_room
-    GROUP BY FactTable.product_type_id;
+	WHERE LocationTable.building = sel_building AND LocationTable.building_floor = sel_floor AND LocationTable.room = sel_room;
 END &&
 DELIMITER ;
 #----------------------------------------

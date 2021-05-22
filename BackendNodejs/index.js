@@ -363,7 +363,7 @@ app.post('/confirmInScanPaper', function(req, res){
  */
 app.post('/displayProductLeft', function(req, res) {
     console.log("Get product type and number left in warehouse");
-    pool.query('CALL show_total_product_warehouse()', function(err, rows) {
+    pool.query('CALL show_total_product_warehouse(?)', [''], function(err, rows) {
         if(err) throw err;
         res.send(JSON.parse(JSON.stringify(rows[0])));
     })
@@ -582,19 +582,62 @@ app.post('/searchImportExport', function(req, res) {
  *  
  */
 app.post('/searchWarehouseProduct', function(req, res) {
+    console.log(req.body);
     console.log("Searching number of product left in warehouse");
     if(!req.body.keyword) {
         pool.query('CALL show_total_product_warehouse(?)', [''], function(err, rows){
-            if(err) throw err;
+            console.log("in here");
+            if(err) return;
             res.send(JSON.parse(JSON.stringify(rows[0])));
         })
     }
     else {
         pool.query('CALL show_total_product_warehouse(?)', [req.body.keyword], function(err, rows){
-            if(err) throw err;
+            if(err) return;
             res.send(JSON.parse(JSON.stringify(rows[0])));
         })
     }
+})
+
+
+/********************************************/
+/**** Create Inventory Checking *************/
+
+/*
+ *  '/createInventoryCheckingPaper'
+ *  @brief: API to create Inventory Checking paper and Inventory checking product
+ *  createDate:             ---- Date Created
+ *  buildingName:           ---- building I or J or K
+ *  buildingFloor:          ---- 1 2 3
+ *  buildingRoom:           
+ * 
+ *  @retval: None
+ *  
+ */
+
+app.post('/createInventoryCheckingPaper', function(req, res) {
+    console.log('Create Inventory Checking Paper');
+    var createdTime = date_convert(req.body.createDate);
+    //console.log(req.body);
+    pool.query('CALL InventoryCheckingPaperCreate(?,?,?,?)',[createdTime, req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom], function(err) {
+        if(err) throw err;
+        pool.query('SELECT MAX(id) AS id FROM InventoryCheckingPaperTable', function(err, rows) {
+            if(err) throw err;
+            var paperID = rows[0].id;          //get paperID, now get number of count
+            pool.query('CALL show_products_according_location(?,?,?)', [req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom], function(err, rows){
+                if(err) throw err;
+                for(var i = 0; i < rows[0].length; i++) {
+                    pool.query('CALL AddInventoryCheckingProduct(?,?,?)', [rows[0][i].id, paperID, rows[0][i].amount], function(err){
+                        if(err) throw err;
+                        pool.query('CALL ShowDetailCheckingPaper(?)', [paperID], function(err, rows){
+                            if(err) throw err;
+                            res.send(JSON.parse(JSON.stringify(rows[0])));
+                        })
+                    })
+                }
+            })
+        })
+    })
 })
 
 /*

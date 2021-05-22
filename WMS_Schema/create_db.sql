@@ -65,7 +65,8 @@ CREATE TABLE OutPaperTable (
 	id INT auto_increment PRIMARY KEY,
 	buyer VARCHAR(100),
     created_at TIMESTAMP DEFAULT NOW(),
-    cur_status CHAR(1) NOT NULL DEFAULT 'p'
+    cur_status CHAR(1) NOT NULL DEFAULT 'p',
+    paper_desc VARCHAR(100) NOT NULL DEFAULT ''
 );
 
 CREATE TABLE TotalOutProductTable (
@@ -108,7 +109,31 @@ CREATE TABLE id_barcode (
     paper_id INT NOT NULL,
     FOREIGN KEY (product_type_id) references ProductTypeTable(id)
 );
+
+CREATE TABLE InventoryCheckingPaperTable (
+	id INT auto_increment PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT NOW(),
+    first_location INT,
+    last_location INT,
+    cur_status CHAR(1) DEFAULT 'p',
+    FOREIGN KEY (first_location) REFERENCES LocationTable(id),
+    FOREIGN KEY (last_location) REFERENCES LocationTable(id)
+);
+
+CREATE TABLE InventoryCheckingProductTable (
+	id INT,
+    paper_id INT,
+    sys_amount INT DEFAULT 0,
+    real_amount INT DEFAULT 0,
+    cur_status CHAR(1) DEFAULT 'p',
+    FOREIGN KEY(id) references FactTable(id),
+    FOREIGN KEY (paper_id) REFERENCES InventoryCheckingPaperTable(id)
+);
+
 DROP TABLE id_barcode;
+
+DROP TABLE InventoryCheckingProductTable;
+DROP TABLE InventoryCheckingPaperTable;
 
 DROP TABLE SingleOutProductTable;
 DROP TABLE FactTable;
