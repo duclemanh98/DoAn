@@ -38,7 +38,8 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS show_products_according_location;
 CREATE PROCEDURE show_products_according_location (IN sel_building CHAR(1), IN sel_floor INT, IN sel_room INT)
 BEGIN
-	SELECT FactTable.id, FactTable.product_type_id, ProductTypeTable.cur_name, FactTable.location_id, FactTable.amount
+	SELECT FactTable.id, FactTable.product_type_id, ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox,
+		   FactTable.location_id, FactTable.amount
     FROM FactTable
 	JOIN ProductTypeTable
 		ON FactTable.product_type_id = ProductTypeTable.id

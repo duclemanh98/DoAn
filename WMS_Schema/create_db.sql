@@ -125,13 +125,33 @@ CREATE TABLE InventoryCheckingProductTable (
     paper_id INT,
     sys_amount INT DEFAULT 0,
     real_amount INT DEFAULT 0,
-    cur_status CHAR(1) DEFAULT 'p',
+    cur_status CHAR(1) DEFAULT 'p',				## p - pending, c - complete and correct,  or m - complete but missing
     FOREIGN KEY(id) references FactTable(id),
     FOREIGN KEY (paper_id) REFERENCES InventoryCheckingPaperTable(id)
 );
 
+CREATE TABLE InInventoryProductTable (
+	product_id INT,
+    paper_id INT,
+    amount INT DEFAULT 0,
+    FOREIGN KEY (product_id) REFERENCES InventoryCheckingProductTable(id),
+    FOREIGN KEY (paper_id) REFERENCES InventoryCheckingPaperTable(id),
+    PRIMARY KEY (product_id, paper_id)
+);
+
+CREATE TABLE OutInventoryProductTable (
+	product_id INT,
+    paper_id INT,
+    amount INT DEFAULT 0,
+    FOREIGN KEY (product_id) REFERENCES InventoryCheckingProductTable(id),
+    FOREIGN KEY (paper_id) REFERENCES InventoryCheckingPaperTable(id),
+    PRIMARY KEY (product_id, paper_id)
+);
+
 DROP TABLE id_barcode;
 
+DROP TABLE InInventoryProductTable;
+DROP TABLE OutInventoryProductTable;
 DROP TABLE InventoryCheckingProductTable;
 DROP TABLE InventoryCheckingPaperTable;
 

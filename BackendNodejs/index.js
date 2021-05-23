@@ -17,6 +17,7 @@ app.use(express.urlencoded( { extended: false}));
 var mysql = require('mysql');
 const pool = require('./pool');
 const { getConnection, query } = require('./pool');
+const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 
 
 /*
@@ -56,10 +57,15 @@ function check_duplicate(json_obj) {
  *  @retval:    date object
  */
 function date_convert(date_arr) {
-    var dateParts = date_arr.split("/");
-    //console.log(dateParts);
-
-    var dateObject = new Date(+dateParts[2], dateParts[1] - 1, +dateParts[0]);
+    var dateObject;
+    if(date_arr.includes("-")) {
+        var dateParts = date_arr.split("-");
+        dateObject = new Date(+dateParts[2], dateParts[1] - 1, +dateParts[0]);
+    } 
+    else {
+        var dateParts = date_arr.split("/");
+        dateObject = new Date(+dateParts[2], dateParts[1] - 1, +dateParts[0]);
+    }
     return dateObject;
 }
 
@@ -155,15 +161,27 @@ app.post('/inPaperCreate', function(req, res){
     //let created_at = new Date(req.body.year, req.body.month - 1, req.body.date);
     //let created_at = new Date(2021, 00, 31);
     //console.log(created_at);
-    var dateObject = date_convert(req.body.created_time);
-    console.log(req.body);
-    pool.query("CALL create_in_paper_with_date(?,?,?)", [req.body.store, dateObject, req.body.description], function(err){
-        if(err) return res.json(0);
-        pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
-            if(err) throw err;
-            return res.json(result[0].paper_id);
+    if(!req.body.created_time) {
+        pool.query("CALL create_in_paper_wo_date(?)", [req.body.store], function(err){
+            if(err) return res.json(0);
+            pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
+                if(err) throw err;
+                return res.json(result[0].paper_id);
+            })
         })
-    })
+    }
+    else {
+        var dateObject = date_convert(req.body.created_time);
+        console.log(req.body);
+        pool.query("CALL create_in_paper_with_date(?,?,?)", [req.body.store, dateObject, req.body.description], function(err){
+            if(err) return res.json(0);
+            pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
+                if(err) throw err;
+                return res.json(result[0].paper_id);
+            })
+        })
+    }
+    
 })
 
 /*
@@ -229,7 +247,7 @@ app.post('/displayAllInPaper', function(req, res){
     pool.query('SELECT * FROM InPaperTable', function(err, results){
         if(err) throw err;
         for(var i = 0; i < results.length; i++){
-            results[i].created_at = results[i].created_at.split(' ')[0];
+            // results[i].created_at = results[i].created_at.split(' ')[0];
         }
         res.send(JSON.parse(JSON.stringify(results)));
     })
@@ -380,15 +398,27 @@ app.post('/displayProductLeft', function(req, res) {
  *  paper_id:               ---ID of paper
  */
 app.post('/createOutPaper', function(req, res){
-    var dateObject = date_convert(req.body.createDate);
-    console.log(req.body);
-    pool.query("CALL create_out_paper_with_date(?,?)", [req.body.buyer, dateObject], function(err){
-        if(err) return res.json(0);
-        pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
-            if(err) throw err;
-            return res.json(rows[0].paper_id);
+    if(!req.body.createDate) {
+        pool.query("CALL create_out_paper_wo_date(?)", [req.body.buyer], function(err){
+            if(err) return res.json(0);
+            pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
+                if(err) throw err;
+                return res.json(rows[0].paper_id);
+            })
         })
-    })
+    }
+    else {
+        var dateObject = date_convert(req.body.createDate);
+        console.log(req.body);
+        pool.query("CALL create_out_paper_with_date(?,?)", [req.body.buyer, dateObject], function(err){
+            if(err) return res.json(0);
+            pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
+                if(err) throw err;
+                return res.json(rows[0].paper_id);
+            })
+        })
+    }
+    
 })
 
 /*
@@ -437,7 +467,8 @@ app.post('/displayAllOutPaper', function(req, res){
     pool.query('SELECT * FROM OutPaperTable', function(err, rows){
         if(err) throw err;
         for(var i = 0; i < rows.length; i++){
-            rows[i].created_at = rows[i].created_at.split(' ')[0];
+            console.log(rows[i].created_at);
+            // rows[i].created_at = rows[i].created_at.split(' ')[0];
         }
         res.send(JSON.parse(JSON.stringify(rows)));
     })
@@ -586,7 +617,6 @@ app.post('/searchWarehouseProduct', function(req, res) {
     console.log("Searching number of product left in warehouse");
     if(!req.body.keyword) {
         pool.query('CALL show_total_product_warehouse(?)', [''], function(err, rows){
-            console.log("in here");
             if(err) return;
             res.send(JSON.parse(JSON.stringify(rows[0])));
         })
@@ -604,41 +634,267 @@ app.post('/searchWarehouseProduct', function(req, res) {
 /**** Create Inventory Checking *************/
 
 /*
+ *  '/checkValidLocation'
+ *  @brief: API used before creating Inventory Checking paper and Inventory checking product => check if location is valid
+ *  buildingName:           ---- building I or J or K
+ *  buildingFloor:          ---- 1 2 3
+ *  buildingRoom:           ---- 
+ * 
+ *  @retval: true or false
+ *  
+ */
+
+app.post('/checkValidLocation', function(req, res){
+    console.log('Check location: building ?, floor ?, room ?', [req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom]);
+    pool.query('SELECT COUNT(*) AS num FROM LocationTable WHERE building = ? AND building_floor = ? AND room = ?', [req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom], function(err, rows){
+        if(err) throw err;
+        if(rows[0].num == 0) return res.json(false);
+        else return res.json(true);
+    })
+})
+
+
+//--------------------------------------
+/*
+ *  @brief: API to create Inventory Checking Paper and return ID of paper
+ */
+function createInventoryChecking(req) {
+    return new Promise(resolve => {
+        pool.query('CALL InventoryCheckingPaperCreate(?,?,?)',[req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom], function(err) {
+            if(err) throw err;
+            pool.query('SELECT MAX(id) AS id FROM InventoryCheckingPaperTable', function(err, rows) {
+                if(err) throw err;
+                resolve(rows[0].id);
+            })    
+        })
+    })
+}
+/*
+ *  @brief: API to select all products corresponding to location sent in request
+ */
+function selectProductInLocation(req) {
+    return new Promise(resolve => {
+        pool.query('CALL show_products_according_location(?,?,?)', [req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom], function(err, rows){
+            if(err) throw err;
+            resolve(rows[0]);
+        })
+    })
+}
+
+/*
+ *  @brief: adding each product into InventoryProductTable
+ */
+function addPerProductToInventory(perProductFile, paperID) {
+    return new Promise(resolve => {
+        pool.query('CALL AddInventoryCheckingProduct(?,?,?)', [perProductFile.id, paperID, perProductFile.amount], function(err){
+            if(err) throw err;
+            resolve(true);
+        })
+    })
+}
+
+/*
  *  '/createInventoryCheckingPaper'
  *  @brief: API to create Inventory Checking paper and Inventory checking product
  *  createDate:             ---- Date Created
  *  buildingName:           ---- building I or J or K
  *  buildingFloor:          ---- 1 2 3
- *  buildingRoom:           
+ *  buildingRoom:           ---- 
  * 
- *  @retval: None
+ *  @retval:
+ *  location_id
+ *  building
+ *  building_floor
+ *  room
+ *  rack
+ *  rack_bin
+ *  product_id
+ *  product_type_id
+ *  cur_name
+ *  sys_amount
+ *  real_amount
+ *  cur_status
  *  
  */
 
-app.post('/createInventoryCheckingPaper', function(req, res) {
+app.post('/createInventoryCheckingPaper', async(req, res) => {
     console.log('Create Inventory Checking Paper');
-    var createdTime = date_convert(req.body.createDate);
     //console.log(req.body);
-    pool.query('CALL InventoryCheckingPaperCreate(?,?,?,?)',[createdTime, req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom], function(err) {
+    var paperID = await createInventoryChecking(req);
+    var productFile = await selectProductInLocation(req);
+    
+    for(var i = 0; i < productFile.length; i++) {
+        await addPerProductToInventory(productFile[i], paperID);
+    }
+    pool.query('CALL ShowDetailCheckingPaper(?)', [paperID], function(err, rows) {
         if(err) throw err;
-        pool.query('SELECT MAX(id) AS id FROM InventoryCheckingPaperTable', function(err, rows) {
-            if(err) throw err;
-            var paperID = rows[0].id;          //get paperID, now get number of count
-            pool.query('CALL show_products_according_location(?,?,?)', [req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom], function(err, rows){
-                if(err) throw err;
-                for(var i = 0; i < rows[0].length; i++) {
-                    pool.query('CALL AddInventoryCheckingProduct(?,?,?)', [rows[0][i].id, paperID, rows[0][i].amount], function(err){
-                        if(err) throw err;
-                        pool.query('CALL ShowDetailCheckingPaper(?)', [paperID], function(err, rows){
-                            if(err) throw err;
-                            res.send(JSON.parse(JSON.stringify(rows[0])));
-                        })
-                    })
-                }
-            })
-        })
+        res.send(JSON.parse(JSON.stringify(rows[0])))
     })
 })
+
+/*
+ *  '/detailInventoryCheckingPaper'
+ *  @brief: API to show detail of Inventory Checking paper
+ *  req: paperID:           --- ID of checking paper
+ *  
+ *  @retval:
+ *  location_id:            --- ID of location
+ *  building
+ *  building_floor
+ *  room
+ *  rack
+ *  rack_bin
+ *  product_id:             --- ID of product
+ *  product_type_id:        --- ID of type
+ *  cur_name:               --- name of product
+ *  sys_amount:             --- number of products on system
+ *  real_amount:            --- number of products in real life
+ *  cur_status:             --- status of product checking (p or c)
+ *  perbox
+ *  
+ */
+app.post('/detailInventoryCheckingPaper', function(req, res) {
+    //console.log(req.body);
+    console.log('Detail of Inventory Checking Paper '+req.body.paperID);
+    pool.query('CALL ShowDetailCheckingPaper(?)', [req.body.paperID], function(err, rows){
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
+    })
+})
+
+
+/*
+ *  '/displayAllInventoryCheckingPaper'
+ *  @brief: API to list all Inventory Checking paper     
+ * 
+ *  @retval:
+ *  id:         --- id of checking paper
+ *  created_at: --- time created
+ *  building:
+ *  building_floor
+ *  building_room
+ *  cur_status:           --- 'c' - complete and correct / 'p' pending / m: complete but missing products
+ */
+
+app.post('/displayAllInventoryCheckingPaper', function(req, res){
+    console.log('Display all Inventory checking paper');
+    pool.query('CALL DisplayAllInventoryPaper()', function(err, rows){
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
+    })
+})
+
+
+//---------------------------------------------
+function AddInventoryProduct(perProductFile, paperID){
+    return new Promise(resolve => {
+        if(perProductFile.cur_status == 'c') {
+            if(perProductFile.real_amount > perProductFile.sys_amount) {
+                var addAmount = productFile[i].real_amount - productFile[i].sys_amount;
+                pool.query('CALL AddInInventoryProduct(?,?,?)',[perProductFile.productID, paperID, addAmount], function(err){
+                    if(err) throw err;
+                    pool.query('CALL UpdateAmountProductSystem(?,?)', [perProductFile.productID, perProductFile.real_amount], function(err){
+                        if(err) throw err;
+                        resolve(true);
+                    })
+                })
+            }
+            else if(perProductFile.real_amount < perProductFile.sys_amount) {
+                var addAmount = perProductFile.sys_amount - perProductFile.real_amount;
+                pool.query('CALL AddOutInventoryProduct(?,?,?)',[perProductFile.productID, paperID, addAmount], function(err){
+                    if(err) throw err;
+                    pool.query('CALL UpdateAmountProductSystem(?,?)', [perProductFile.productID, perProductFile.real_amount], function(err){
+                        if(err) throw err;
+                        resolve(true);
+                    })
+                })
+            }
+        }
+    })
+}
+
+/*
+ *  '/confirmInventoryCheckingPaper'
+ *  @brief: API to confirm 1 inventory checking paper / automatically generate in and out inventory paper
+ *  req includes:  
+ *  paperID:            --- id of checking paper
+ *  productInfo:
+ *      productID:      --- id of product
+ *      sys_amount:     --- number of products on system
+ *      real_amount:    --- amount of products in real life
+ *      cur_status:     --- status of checking products (checked or not - c or p)
+ * 
+ *  @retval: none
+ *  
+ */
+
+app.post('/confirmInventoryCheckingPaper', async(req, res) => {
+    console.log('Confirm Inventory Checking Paper '+req.body.paperID);
+    var productFile = req.body.productInfo;
+    for(var i = 0; i < productFile.length; i++) {
+        await AddInventoryProduct(productFile[i], paperID);
+    }
+    pool.query('CALL ConfirmInventoryCheckingPaper(?)', [req.body.paperID], function(err){
+        if(err) throw err;
+    })
+})
+
+
+/*
+ *  '/detailInInventoryPaper'
+ *  @brief: API to show detail of In Inventory paper
+ *  req: paperID:           --- ID of checking paper
+ *  
+ *  @retval:
+ *  location_id:            --- ID of location
+ *  building
+ *  building_floor
+ *  room
+ *  rack
+ *  rack_bin
+ *  product_id:             --- ID of product
+ *  type_id:                --- ID of type
+ *  cur_name:               --- name of product
+ *  amount:                 --- in amount
+ *  
+ */
+
+app.post('/detailInInventoryPaper', function(req, res){
+    console.log('Show detail of In Inventory of paper '+req.body.paperID);
+    pool.query('CALL DetailInInventoryChecking(?)', [req.body.paperID], function(err, rows) {
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
+    })
+})
+
+/*
+ *  '/detailOutInventoryPaper'
+ *  @brief: API to show detail of Out Inventory paper
+ *  req: paperID:           --- ID of checking paper
+ *  
+ *  @retval:
+ *  location_id:            --- ID of location
+ *  building
+ *  building_floor
+ *  room
+ *  rack
+ *  rack_bin
+ *  product_id:             --- ID of product
+ *  type_id:                --- ID of type
+ *  cur_name:               --- name of product
+ *  amount:                 --- out amount
+ *  
+ */
+
+app.post('/detailOutInventoryPaper', function(req, res){
+    console.log('Show detail of Out Inventory of paper '+req.body.paperID);
+    pool.query('CALL DetailOutInventoryChecking(?)', [req.body.paperID], function(err, rows) {
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
+    })
+})
+
+
 
 /*
  *******************************************************************

@@ -75,3 +75,10 @@ CALL show_products_according_location('I', 1, 1);
 
 SELECT * FROM InventoryCheckingPaperTable;
 SELECT * FROM InventoryCheckingProductTable;
+
+CALL ShowDetailCheckingPaper(1);
+
+CALL DisplayAllInventoryPaper();
+
+SELECT COUNT(*) FROM LocationTable WHERE building = 'J';
+
