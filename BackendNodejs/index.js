@@ -57,16 +57,26 @@ function check_duplicate(json_obj) {
  *  @retval:    date object
  */
 function date_convert(date_arr) {
-    var dateObject;
+    var dateParts;
     if(date_arr.includes("-")) {
         var dateParts = date_arr.split("-");
-        dateObject = new Date(+dateParts[2], dateParts[1] - 1, +dateParts[0]);
     } 
-    else {
+    else if(date_arr.includes("/")){
         var dateParts = date_arr.split("/");
-        dateObject = new Date(+dateParts[2], dateParts[1] - 1, +dateParts[0]);
     }
-    return dateObject;
+    else {
+        return new Date;
+    }
+    var d = parseInt(dateParts[0], 10)
+    var m = parseInt(dateParts[1], 10)
+    var y = parseInt(dateParts[2], 10)
+    
+    var date = new Date(y,m-1,d);
+
+    if (date.getFullYear() == y && date.getMonth() + 1 == m && date.getDate() == d) {
+        return date;
+    }
+    else return new Date;
 }
 
 /*
@@ -153,35 +163,20 @@ app.post('/userDelete', async(req, res) => {
 
 /*
  *  @brief: API to create new in paper
- *  request: json file include supplier and created_date
+ *  request: json file include supplier and created_date, paperDesc
  * 
  *  @retval: ID of paper
  */
 app.post('/inPaperCreate', function(req, res){
-    //let created_at = new Date(req.body.year, req.body.month - 1, req.body.date);
-    //let created_at = new Date(2021, 00, 31);
-    //console.log(created_at);
-    if(!req.body.created_time) {
-        pool.query("CALL create_in_paper_wo_date(?)", [req.body.store], function(err){
-            if(err) return res.json(0);
-            pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
-                if(err) throw err;
-                return res.json(result[0].paper_id);
-            })
+    var dateObject = date_convert(req.body.created_time);
+    console.log(req.body);
+    pool.query("CALL create_in_paper_with_date(?,?,?)", [req.body.store, dateObject, req.body.description], function(err){
+        if(err) return res.json(0);
+        pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
+            if(err) throw err;
+            return res.json(result[0].paper_id);
         })
-    }
-    else {
-        var dateObject = date_convert(req.body.created_time);
-        console.log(req.body);
-        pool.query("CALL create_in_paper_with_date(?,?,?)", [req.body.store, dateObject, req.body.description], function(err){
-            if(err) return res.json(0);
-            pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
-                if(err) throw err;
-                return res.json(result[0].paper_id);
-            })
-        })
-    }
-    
+    })  
 })
 
 /*
@@ -240,6 +235,7 @@ app.post('/getProductType', function(req, res) {
  *  supplier                --supplier
  *  created_at              --date that paper is created
  *  cur_status              --status of paper
+ *  paper_desc:             --description
  */
 
 app.post('/displayAllInPaper', function(req, res){
@@ -251,6 +247,49 @@ app.post('/displayAllInPaper', function(req, res){
         }
         res.send(JSON.parse(JSON.stringify(results)));
     })
+})
+
+/*
+ *  /searchInPaperWithProduct
+ *  @brief: API to show all in paper containing product
+ *  req: 
+ *  productID: ID of product
+ *  productName: name of product
+ * 
+ *  @retval: object contain all info about date
+ *  id                      --id of paper
+ *  supplier                --supplier
+ *  created_at              --date that paper is created
+ *  cur_status              --status of paper
+ *  paper_desc:             --description of paper
+ */
+
+app.post('/searchInPaperWithProduct', function(req, res) {
+    console.log(req.body);
+    console.log("Search In Paper with product ID ");
+    var product_name = '';
+    try {
+        if(req.body.productName.name) {
+            product_name = req.body.productName.name;
+        }
+    
+        if(req.body.productID) {
+            var prodId = req.body.productID.split('-')[0];
+            pool.query('CALL search_in_paper_with_product(?,?)', [prodId, product_name], function(err, rows){
+                if(err) throw err;
+                res.send(JSON.parse(JSON.stringify(rows[0])));
+            })
+        }
+        else {
+            pool.query('CALL search_in_paper_with_productname(?)', [product_name], function(err, rows){
+                if(err) throw err;
+                res.send(JSON.parse(JSON.stringify(rows[0])));
+            })
+        }
+    }
+    catch {
+        res.send({error: "SQL error"});
+    }
 })
 
 /*
@@ -393,32 +432,22 @@ app.post('/displayProductLeft', function(req, res) {
  *  req: 
  *  createDate:             ---date created
  *  buyer:                  ---buyer of product
+ *  paperDesc:              ---description
  * 
  *  @retval:
  *  paper_id:               ---ID of paper
  */
 app.post('/createOutPaper', function(req, res){
-    if(!req.body.createDate) {
-        pool.query("CALL create_out_paper_wo_date(?)", [req.body.buyer], function(err){
-            if(err) return res.json(0);
-            pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
-                if(err) throw err;
-                return res.json(rows[0].paper_id);
-            })
-        })
-    }
-    else {
-        var dateObject = date_convert(req.body.createDate);
+    var dateObject = date_convert(req.body.createDate);
         console.log(req.body);
-        pool.query("CALL create_out_paper_with_date(?,?)", [req.body.buyer, dateObject], function(err){
+        pool.query("CALL create_out_paper_with_date(?,?,?)", [req.body.buyer, dateObject, req.body.paperDesc], function(err){
             if(err) return res.json(0);
             pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
                 if(err) throw err;
                 return res.json(rows[0].paper_id);
-            })
+            
         })
-    }
-    
+    })
 })
 
 /*
@@ -460,6 +489,7 @@ app.post('/addOutProduct', async(req, res) => {
  *  buyer                   --supplier
  *  created_at              --date that paper is created
  *  cur_status              --status of paper
+ *  paper_desc:             --description of paper
  */
 
 app.post('/displayAllOutPaper', function(req, res){
@@ -473,6 +503,51 @@ app.post('/displayAllOutPaper', function(req, res){
         res.send(JSON.parse(JSON.stringify(rows)));
     })
 })
+
+/*
+ *  /searchOutPaperWithProduct
+ *  @brief: API to show all in paper containing product
+ *  req: 
+ *  productID: ID of product
+ *  productName: name of product
+ * 
+ *  @retval: object contain all info about date
+ *  id                      --id of paper
+ *  buyer                --supplier
+ *  created_at              --date that paper is created
+ *  cur_status              --status of paper
+ *  paper_desc:             --description
+ */
+
+app.post('/searchOutPaperWithProduct', function(req, res) {
+    console.log(req.body);
+    console.log("Search Out Paper with product ID ");
+    var product_name = '';
+    if(req.body.productName.name) {
+        product_name = req.body.productName.name;
+    }
+    try {
+        if(req.body.productID) {
+            var prodId;
+            prodId = req.body.productID.split('-')[0];
+            
+            pool.query('CALL search_out_paper_with_product(?,?)', [prodId, product_name], function(err, rows){
+                if(err) return;
+                res.send(JSON.parse(JSON.stringify(rows[0])));
+            })
+        }
+        else {
+            pool.query('CALL search_out_paper_with_productname(?)', [product_name], function(err, rows){
+                if(err) return;
+                res.send(JSON.parse(JSON.stringify(rows[0])));
+            })
+        }
+    }
+    catch(err) {
+        res.send({error: "SQL error"});
+    }
+})
+
 
 /*
  *  '/getDetailOutPaper'
@@ -573,10 +648,10 @@ app.post('/confirmOutScanProduct', async(req, res) => {
  *  
  */
 app.post('/searchImportExport', function(req, res) {
-    console.log("Searching import and export amount between "+ req.body.firstDate + " and " + req.body.lastDate);
     var first_date, last_date;
+
     if(req.body.firstDate == '') {
-        first_date = date_convert('01/01/0000');
+        first_date = date_convert('01/01/1975');
     } 
     else first_date = date_convert(req.body.firstDate);
 
@@ -584,6 +659,7 @@ app.post('/searchImportExport', function(req, res) {
         last_date = date_convert('31/12/2099');
     }
     else last_date = date_convert(req.body.lastDate);
+    console.log("Searching import and export amount between "+ first_date + " and " + last_date);
     // var first_date = date_convert(req.body.firstDate);
     // var last_date = date_convert(req.body.lastDate);
     if(req.body.keyword == '') {
@@ -660,7 +736,7 @@ app.post('/checkValidLocation', function(req, res){
  */
 function createInventoryChecking(req) {
     return new Promise(resolve => {
-        pool.query('CALL InventoryCheckingPaperCreate(?,?,?)',[req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom], function(err) {
+        pool.query('CALL InventoryCheckingPaperCreate(?,?,?,?)',[req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom, req.body.paperDesc], function(err) {
             if(err) throw err;
             pool.query('SELECT MAX(id) AS id FROM InventoryCheckingPaperTable', function(err, rows) {
                 if(err) throw err;
@@ -700,6 +776,7 @@ function addPerProductToInventory(perProductFile, paperID) {
  *  buildingName:           ---- building I or J or K
  *  buildingFloor:          ---- 1 2 3
  *  buildingRoom:           ---- 
+ *  paperDesc:              ---- description of paper
  * 
  *  @retval:
  *  location_id
@@ -728,7 +805,13 @@ app.post('/createInventoryCheckingPaper', async(req, res) => {
     }
     pool.query('CALL ShowDetailCheckingPaper(?)', [paperID], function(err, rows) {
         if(err) throw err;
-        res.send(JSON.parse(JSON.stringify(rows[0])))
+        // rows[0]["paperID"] = paperID;
+        var jsonObject = {paperID : '', productInfo : []};
+        jsonObject.paperID = paperID;
+        for(var i = 0; i < rows[0].length; i++) {
+            jsonObject.productInfo[i] = rows[0][i];
+        }
+        res.send(jsonObject);
     })
 })
 
@@ -774,6 +857,7 @@ app.post('/detailInventoryCheckingPaper', function(req, res) {
  *  building_floor
  *  building_room
  *  cur_status:           --- 'c' - complete and correct / 'p' pending / m: complete but missing products
+ *  paper_desc:         description of paper
  */
 
 app.post('/displayAllInventoryCheckingPaper', function(req, res){
@@ -784,32 +868,85 @@ app.post('/displayAllInventoryCheckingPaper', function(req, res){
     })
 })
 
+//---------------------------------------------
+function UpdateAmountSystem(perProductInfo, ioChecking, paperID) {
+    return new Promise(resolve => {
+        pool.query('CALL UpdateAmountProductSystem(?,?,?,?)', [perProductInfo.productID, perProductInfo.mis_amount, ioChecking, paperID], function(err, rows){
+            if(err) throw err;
+            resolve(true);
+        })
+    })
+}
+
+/*
+ *  '/updateInSystemAmount'
+ *  @brief: API to confirm 1 inventory checking paper / automatically generate in and out inventory paper
+ *  req includes:  
+ *  paperID:            --- id of checking paper
+ *  productInfo:
+ *      productID:      --- id of product
+ *      mis_amount:     --- number of products on system
+ * 
+ *  @retval: none
+ *  
+ */
+
+
+app.post('/updateInSystemAmount', async(req, res) => {
+    console.log("Update in amount in system");
+    for(var i = 0; i < req.body.productInfo.length; i++){
+        await UpdateAmountSystem(req.body.productInfo[i], 'i', req.body.paperID);
+    }
+    pool.query('CALL ConfirmIOCheckingPaper(?,?)', [req.body.paperID, 'i'], function(err, rows) {
+        if(err) throw err;
+        pool.query('CALL CheckBlankIOChecking(?)', [req.body.paperID], function(err, rows){
+            if(err) throw err;
+            pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
+                if(err) throw err;
+            })
+        })   
+    })
+})
+
+/*
+ *  '/updateOutSystemAmount'
+ *  @brief: API to confirm 1 inventory checking paper / automatically generate in and out inventory paper
+ *  req includes:  
+ *  paperID:            --- id of checking paper
+ *  productInfo:
+ *      productID:      --- id of product
+ *      mis_amount:     --- number of products on system
+ * 
+ *  @retval: none
+ *  
+ */
+
+app.post('/updateOutSystemAmount', async(req, res) => {
+    console.log("Update out amount in system");
+    for(var i = 0; i < req.body.productInfo.length; i++){
+        await UpdateAmountSystem(req.body.productInfo[i], 'o', req.body.paperID);
+    }
+    pool.query('CALL ConfirmIOCheckingPaper(?,?)', [req.body.paperID, 'o'], function(err, rows) {
+        if(err) throw err;
+        pool.query('CALL CheckBlankIOChecking(?)', [req.body.paperID], function(err, rows){
+            if(err) throw err;
+            pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
+                if(err) throw err;
+            })
+        })   
+    })
+})
 
 //---------------------------------------------
-function AddInventoryProduct(perProductFile, paperID){
+function UpdateInventoryProduct(perProductFile, paperID){
     return new Promise(resolve => {
-        if(perProductFile.cur_status == 'c') {
-            if(perProductFile.real_amount > perProductFile.sys_amount) {
-                var addAmount = productFile[i].real_amount - productFile[i].sys_amount;
-                pool.query('CALL AddInInventoryProduct(?,?,?)',[perProductFile.productID, paperID, addAmount], function(err){
-                    if(err) throw err;
-                    pool.query('CALL UpdateAmountProductSystem(?,?)', [perProductFile.productID, perProductFile.real_amount], function(err){
-                        if(err) throw err;
-                        resolve(true);
-                    })
-                })
-            }
-            else if(perProductFile.real_amount < perProductFile.sys_amount) {
-                var addAmount = perProductFile.sys_amount - perProductFile.real_amount;
-                pool.query('CALL AddOutInventoryProduct(?,?,?)',[perProductFile.productID, paperID, addAmount], function(err){
-                    if(err) throw err;
-                    pool.query('CALL UpdateAmountProductSystem(?,?)', [perProductFile.productID, perProductFile.real_amount], function(err){
-                        if(err) throw err;
-                        resolve(true);
-                    })
-                })
-            }
+        if(perProductFile.cur_status == 'h') {
+            pool.query('CALL UpdateIOInventoryChecking(?,?,?,?)', [perProductFile.productID, paperID, perProductFile.sys_amount, perProductFile.real_amount], function(err){
+                if(err) throw err;
+                resolve(true);
+            })
         }
+        resolve(true);
     })
 }
 
@@ -822,7 +959,7 @@ function AddInventoryProduct(perProductFile, paperID){
  *      productID:      --- id of product
  *      sys_amount:     --- number of products on system
  *      real_amount:    --- amount of products in real life
- *      cur_status:     --- status of checking products (checked or not - c or p)
+ *      cur_status:     --- status of checking products (complete or pending or changed - 'c' or 'p' or 'h')
  * 
  *  @retval: none
  *  
@@ -831,8 +968,9 @@ function AddInventoryProduct(perProductFile, paperID){
 app.post('/confirmInventoryCheckingPaper', async(req, res) => {
     console.log('Confirm Inventory Checking Paper '+req.body.paperID);
     var productFile = req.body.productInfo;
+
     for(var i = 0; i < productFile.length; i++) {
-        await AddInventoryProduct(productFile[i], paperID);
+        await UpdateInventoryProduct(productFile[i], req.body.paperID);
     }
     pool.query('CALL ConfirmInventoryCheckingPaper(?)', [req.body.paperID], function(err){
         if(err) throw err;
@@ -855,7 +993,7 @@ app.post('/confirmInventoryCheckingPaper', async(req, res) => {
  *  product_id:             --- ID of product
  *  type_id:                --- ID of type
  *  cur_name:               --- name of product
- *  amount:                 --- in amount
+ *  mis_amount:                 --- in amount
  *  
  */
 
@@ -882,7 +1020,7 @@ app.post('/detailInInventoryPaper', function(req, res){
  *  product_id:             --- ID of product
  *  type_id:                --- ID of type
  *  cur_name:               --- name of product
- *  amount:                 --- out amount
+ *  mis_amount:                 --- out amount
  *  
  */
 

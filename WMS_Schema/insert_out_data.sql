@@ -2,9 +2,9 @@
 
 DELIMITER &&
 DROP PROCEDURE IF EXISTS create_out_paper_with_date;
-CREATE PROCEDURE create_out_paper_with_date(IN buy VARCHAR(100), IN create_time TIMESTAMP)
+CREATE PROCEDURE create_out_paper_with_date(IN buy VARCHAR(100), IN create_time TIMESTAMP, IN out_desc VARCHAR(100))
 BEGIN
-	INSERT INTO OutPaperTable(buyer, created_at) VALUES (buy, create_time);
+	INSERT INTO OutPaperTable(buyer, created_at, paper_desc) VALUES (buy, create_time, out_desc);
 END &&
 DELIMITER ;
 #------------------------------------------

@@ -5,7 +5,7 @@
 ### Tao phieu kiem ke
 DELIMITER &&
 DROP PROCEDURE IF EXISTS InventoryCheckingPaperCreate;
-CREATE PROCEDURE InventoryCheckingPaperCreate(IN buildingName CHAR(1), IN buildingFloor INT, IN buildingRoom INT)
+CREATE PROCEDURE InventoryCheckingPaperCreate(IN buildingName CHAR(1), IN buildingFloor INT, IN buildingRoom INT, IN check_desc VARCHAR(100))
 BEGIN 
 	DECLARE first_pos INT;
     DECLARE last_pos INT;
@@ -17,7 +17,7 @@ BEGIN
     FROM LocationTable
     WHERE LocationTable.building = buildingName AND LocationTable.building_floor = buildingFloor AND LocationTable.room = buildingRoom;
     
-    INSERT INTO InventoryCheckingPaperTable(first_location, last_location) VALUES (first_pos, last_pos);
+    INSERT INTO InventoryCheckingPaperTable(first_location, last_location, paper_desc) VALUES (first_pos, last_pos, check_desc);
 END &&
 DELIMITER ;
 
@@ -39,7 +39,7 @@ CREATE PROCEDURE DisplayAllInventoryPaper()
 BEGIN
 	SELECT InventoryCheckingPaperTable.id, InventoryCheckingPaperTable.created_at,
 		   LocationTable.building, LocationTable.building_floor, LocationTable.room,
-           InventoryCheckingPaperTable.cur_status
+           InventoryCheckingPaperTable.cur_status, InventoryCheckingPaperTable.paper_desc
 	FROM InventoryCheckingPaperTable
     JOIN LocationTable ON LocationTable.id = InventoryCheckingPaperTable.first_location
     ORDER BY InventoryCheckingPaperTable.id ASC;
@@ -66,6 +66,39 @@ BEGIN
 END &&
 DELIMITER ;
 
+#----------------------------------------------
+#### Procedure to update product in inventory product table when doing checking
+DELIMITER &&
+DROP PROCEDURE IF EXISTS UpdateIOInventoryChecking;
+CREATE PROCEDURE UpdateIOInventoryChecking(IN productID INT, IN paperID INT, IN sysAmount INT, IN realAmount INT)
+BEGIN
+	DECLARE misAmount INT;
+    DECLARE in_stat INT;
+    DECLARE out_stat INT;
+    
+    SELECT in_status, out_status INTO in_stat, out_stat FROM InventoryCheckingPaperTable 
+    WHERE InventoryCheckingPaperTable.id = paperID;
+	
+    IF in_stat = 0 AND out_stat = 0 THEN
+		UPDATE InventoryCheckingProductTable SET real_amount = realAmount, cur_status = 'c'
+		WHERE InventoryCheckingProductTable.id = productID AND InventoryCheckingProductTable.paper_id = paperID;
+    
+		IF realAmount > sysAmount THEN
+			SET misAmount = realAmount - sysAmount;
+			UPDATE InventoryCheckingProductTable SET mis_amount = misAmount, product_dir = 'i'
+			WHERE InventoryCheckingProductTable.id = productID AND InventoryCheckingProductTable.paper_id = paperID;
+		ELSEIF realAmount < sysAmount THEN
+			SET misAmount = sysAmount - realAmount;
+			UPDATE InventoryCheckingProductTable SET mis_amount = misAmount, product_dir = 'o'
+			WHERE InventoryCheckingProductTable.id = productID AND InventoryCheckingProductTable.paper_id = paperID;
+		ELSE
+			UPDATE InventoryCheckingProductTable SET mis_amount = 0
+			WHERE InventoryCheckingProductTable.id = productID AND InventoryCheckingProductTable.paper_id = paperID;
+		END IF;
+	END IF;
+END &&
+DELIMITER ;
+
 #--------------------------------------
 #### Procedure to complete CheckingPaper
 DELIMITER &&
@@ -73,65 +106,28 @@ DROP PROCEDURE IF EXISTS ConfirmInventoryCheckingPaper;
 CREATE PROCEDURE ConfirmInventoryCheckingPaper(IN paperID INT)
 BEGIN
 	DECLARE temp_check INT;
-    DECLARE in_check INT;
-    DECLARE out_check INT;
-    SELECT COUNT(*) INTO temp_check FROM InventoryCheckingProductTable
-    WHERE InventoryCheckingProductTable.paper_id = paperID AND InventoryCheckingProductTable.cur_status = 'p';
+    DECLARE io_check INT;
+    DECLARE finish_check CHAR(1);
     
-    SELECT COUNT(*) INTO in_check FROM InInventoryProductTable WHERE InInventoryProductTable.paper_id = paperID;
-    SELECT COUNT(*) INTO out_check FROM OutInventoryProductTable WHERE OutInventoryProductTable.paper_id = paperID;
+    SELECT cur_status INTO finish_check FROM InventoryCheckingPaperTable WHERE id = paperID;
+    #check if finish or not
     
-    IF temp_check = 0 THEN
-		IF in_check = 0 AND out_check = 0 THEN
-			UPDATE InventoryCheckingPaperTable SET cur_status = 'c' WHERE InventoryCheckingPaperTable.id = paperID;
+    IF finish_check != 'c' THEN
+		SELECT COUNT(*) INTO temp_check FROM InventoryCheckingProductTable
+		WHERE InventoryCheckingProductTable.paper_id = paperID AND InventoryCheckingProductTable.cur_status = 'p';
+    
+		SELECT COUNT(*) INTO io_check FROM InventoryCheckingProductTable 
+		WHERE InventoryCheckingProductTable.paper_id = paperID AND InventoryCheckingProductTable.mis_amount != 0;
+    
+		IF temp_check = 0 THEN
+			IF io_check = 0 THEN
+				UPDATE InventoryCheckingPaperTable SET cur_status = 'c' WHERE InventoryCheckingPaperTable.id = paperID;
+			ELSE
+				UPDATE InventoryCheckingPaperTable SET cur_status = 'm' WHERE InventoryCheckingPaperTable.id = paperID;
+			END IF;
 		ELSE
-			UPDATE InventoryCheckingPaperTable SET cur_status = 'm' WHERE InventoryCheckingPaperTable.id = paperID;
+			UPDATE InventoryCheckingPaperTable SET cur_status = 'p' WHERE InventoryCheckingPaperTable.id = paperID;
 		END IF;
-	ELSE
-		UPDATE InventoryCheckingPaperTable SET cur_status = 'p' WHERE InventoryCheckingPaperTable.id = paperID;
-	END IF;
-END &&
-DELIMITER ;
-
-#-------------------------
-#### Add product into InInventoryProductTable
-DELIMITER &&
-DROP PROCEDURE IF EXISTS AddInInventoryProduct;
-CREATE PROCEDURE AddInInventoryProduct(IN productID INT, IN paperID INT, IN addAmount INT)
-BEGIN
-	DECLARE temp_status CHAR(1);
-    
-    ###checking status or current product, if already complet => do not add to In Inventory Product
-    SELECT InventoryCheckingProductTable.cur_status INTO temp_status FROM InventoryCheckingProductTable
-    WHERE InventoryCheckingProductTable.id = productID AND InventoryCheckingProductTable.paper_id = paperID;
-    
-    IF temp_status = 'p' THEN
-		### Add to InInventoryProductTable
-        INSERT INTO InInventoryProductTable(product_id, paper_id, amount) VALUES (productID, paperID, addAmount);
-        
-        ### Update Status in InventoryProductTable
-        UPDATE InventoryCheckingProductTable SET cur_status = 'c'
-        WHERE InventoryCheckingProductTable.id = productID AND InventoryCheckingProductTable.paper_id = paperID;
-	END IF;
-END &&
-DELIMITER ;
-
-#-------------------------
-#### Add product into OutInventoryProductTable
-DELIMITER &&
-DROP PROCEDURE IF EXISTS AddOutInventoryProduct;
-CREATE PROCEDURE AddOutInventoryProduct(IN productID INT, IN paperID INT, IN addAmount INT)
-BEGIN
-	DECLARE temp_status CHAR(1);
-    
-    ###checking status or current product, if already complet => do not add to In Inventory Product
-    SELECT InventoryCheckingProductTable.cur_status INTO temp_status FROM InventoryCheckingProductTable
-    WHERE InventoryCheckingProductTable.id = productID AND InventoryCheckingProductTable.paper_id = paperID;
-    
-    IF temp_status = 'p' THEN
-		INSERT INTO OutInventoryProductTable(product_id, paper_id, amount) VALUES (productID, paperID, addAmount);
-		UPDATE InventoryCheckingProductTable SET cur_status = 'c'
-        WHERE InventoryCheckingProductTable.id = productID AND InventoryCheckingProductTable.paper_id = paperID;
 	END IF;
 END &&
 DELIMITER ;
@@ -140,9 +136,31 @@ DELIMITER ;
 #### Update Amount of product inside system (FactTable)
 DELIMITER &&
 DROP PROCEDURE IF EXISTS UpdateAmountProductSystem;
-CREATE PROCEDURE UpdateAmountProductSystem(IN productID INT, IN updateAmount INT)
+CREATE PROCEDURE UpdateAmountProductSystem(IN productID INT, IN misAmount INT, IN in_out CHAR(1), IN paperID INT)
 BEGIN
-	UPDATE FactTable SET amount = updateAmount WHERE FactTable.id = productID;
+	DECLARE location INT;
+    DECLARE temp_amount INT;
+    DECLARE in_stat, out_stat INT;
+    
+    SELECT FactTable.amount INTO temp_amount FROM FactTable WHERE FactTable.id = productID;
+    SELECT in_status, out_status INTO in_stat, out_stat FROM InventoryCheckingPaperTable
+    WHERE id = paperID;
+    
+    IF in_out = 'i' AND in_stat = 0 THEN
+		SET temp_amount = temp_amount + misAmount;
+	END IF;
+    
+    IF in_out = 'o' AND out_stat = 0 THEN
+		SET temp_amount = temp_amount - misAmount;
+    END IF;
+    
+	UPDATE FactTable SET amount = temp_amount WHERE FactTable.id = productID;
+    
+    IF temp_amount = 0 THEN
+		SELECT location_id INTO location FROM FactTable WHERE FactTable.id = productID;
+        UPDATE FactTable SET location_id = NULL WHERE FactTable.id = productID;
+        UPDATE LocationTable SET bin_status = 'free' WHERE LocationTable.id = location;
+    END IF;
 END &&
 DELIMITER ;
 
@@ -152,26 +170,17 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS DetailInInventoryChecking;
 CREATE PROCEDURE DetailInInventoryChecking(IN paperID INT)
 BEGIN
-	DROP TEMPORARY TABLE IF EXISTS temp_table;
-    CREATE TEMPORARY TABLE temp_table AS (
-		SELECT FactTable.id AS product_id, ProductTypeTable.id AS type_id, ProductTypeTable.cur_name,
-			   LocationTable.id AS location_id, LocationTable.rack, LocationTable.rack_bin,
-               LocationTable.building, LocationTable.building_floor, LocationTable.room
-		FROM FactTable
-		JOIN InventoryCheckingProductTable ON FactTable.id = InventoryCheckingProductTable.id
-		JOIN LocationTable ON FactTable.location_id = LocationTable.id
-		JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
-		WHERE InventoryCheckingProductTable.paper_id = paperID
-    );
-    
-    SELECT temp_table.product_id, temp_table.type_id, temp_table.cur_name,
-		   temp_table.location_id, temp_table.rack, temp_table.rack_bin,
-           InInventoryProductTable.amount,
-           temp_table.building, temp_table.building_floor, temp_table.room
-	FROM temp_table
-    JOIN InInventoryProductTable ON temp_table.product_id = InInventoryProductTable.product_id
-    WHERE InInventoryProductTable.paper_id = paperID
-    ORDER BY temp_table.location_id ASC;
+	SELECT LocationTable.id AS location_id, LocationTable.building, LocationTable.building_floor,
+		LocationTable.room, LocationTable.rack, LocationTable.rack_bin,
+        FactTable.id AS product_id,  FactTable.product_type_id,
+        ProductTypeTable.cur_name,
+        InventoryCheckingProductTable.mis_amount
+    FROM FactTable
+    JOIN LocationTable ON FactTable.old_location = LocationTable.id
+    JOIN InventoryCheckingProductTable ON FactTable.id = InventoryCheckingProductTable.id
+    JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
+    WHERE InventoryCheckingProductTable.paper_id = paperID AND product_dir = 'i'
+	ORDER BY LocationTable.id ASC;
 END &&
 DELIMITER ;
 
@@ -181,27 +190,68 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS DetailOutInventoryChecking;
 CREATE PROCEDURE DetailOutInventoryChecking(IN paperID INT)
 BEGIN
-	DROP TEMPORARY TABLE IF EXISTS temp_table;
-    CREATE TEMPORARY TABLE temp_table AS (
-		SELECT FactTable.id AS product_id, ProductTypeTable.id AS type_id, ProductTypeTable.cur_name,
-			   LocationTable.id AS location_id, LocationTable.rack, LocationTable.rack_bin,
-               LocationTable.building, LocationTable.building_floor, LocationTable.room
-		FROM FactTable
-		JOIN InventoryCheckingProductTable ON FactTable.id = InventoryCheckingProductTable.id
-		JOIN LocationTable ON FactTable.location_id = LocationTable.id
-		JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
-		WHERE InventoryCheckingProductTable.paper_id = paperID
-    );
-    
-    SELECT temp_table.product_id, temp_table.type_id, temp_table.cur_name,
-		   temp_table.location_id, temp_table.rack, temp_table.rack_bin,
-           OutInventoryProductTable.amount,
-           temp_table.building, temp_table.building_floor, temp_table.room
-	FROM temp_table
-    JOIN InInventoryProductTable ON temp_table.product_id = InInventoryProductTable.product_id
-    WHERE InInventoryProductTable.paper_id = paperID
-    ORDER BY temp_table.location_id ASC;
+	SELECT LocationTable.id AS location_id, LocationTable.building, LocationTable.building_floor,
+		LocationTable.room, LocationTable.rack, LocationTable.rack_bin,
+        FactTable.id AS product_id,  FactTable.product_type_id,
+        ProductTypeTable.cur_name,
+        InventoryCheckingProductTable.mis_amount
+    FROM FactTable
+    JOIN LocationTable ON FactTable.old_location = LocationTable.id
+    JOIN InventoryCheckingProductTable ON FactTable.id = InventoryCheckingProductTable.id
+    JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
+    WHERE InventoryCheckingProductTable.paper_id = paperID AND product_dir = 'o'
+	ORDER BY LocationTable.id ASC;
 END &&
 DELIMITER ;
 
 #---------------------------------------
+#### Procedure used to set the checking to be completed even if mismatch
+DELIMITER &&
+DROP PROCEDURE IF EXISTS ConfirmMismatchCheckingPaper;
+CREATE PROCEDURE ConfirmMismatchCheckingPaper(IN paperID INT)
+BEGIN
+	UPDATE InventoryCheckingPaperTable
+    SET cur_status = 'c'
+    WHERE InventoryCheckingPaperTable.id = paperID AND InventoryCheckingPaperTable.in_status = 1
+		AND InventoryCheckingPaperTable.out_status = 1;
+END &&
+DELIMITER ;
+
+#### Procedure to update in / out status
+DELIMITER &&
+DROP PROCEDURE IF EXISTS ConfirmIOCheckingPaper;
+CREATE PROCEDURE ConfirmIOCheckingPaper(IN paperID INT, IN io_check CHAR(1))
+BEGIN
+	IF io_check = 'i' THEN
+		UPDATE InventoryCheckingPaperTable
+		SET in_status = 1
+		WHERE InventoryCheckingPaperTable.id = paperID;
+	ELSEIF io_check = 'o' THEN
+		UPDATE InventoryCheckingPaperTable
+		SET out_status = 1
+		WHERE InventoryCheckingPaperTable.id = paperID;
+	END IF;
+END &&
+DELIMITER ;
+
+#### Check if blank paper => confirm in/out
+DELIMITER &&
+DROP PROCEDURE IF EXISTS CheckBlankIOChecking;
+CREATE PROCEDURE CheckBlankIOChecking(IN paperID INT)
+BEGIN
+	DECLARE check_count INT;
+    SELECT COUNT(*) INTO check_count FROM InventoryCheckingProductTable
+    WHERE paper_id = paperID AND product_dir = 'i' AND mis_amount != 0;
+    
+    IF check_count = 0 THEN
+		UPDATE InventoryCheckingPaperTable SET in_status = 1 WHERE id = paperID;
+    END IF;
+    
+    SELECT COUNT(*) INTO check_count FROM InventoryCheckingProductTable
+    WHERE paper_id = paperID AND product_dir = 'o' AND mis_amount != 0;
+    
+    IF check_count = 0 THEN
+		UPDATE InventoryCheckingPaperTable SET out_status = 1 WHERE id = paperID;
+    END IF;
+END &&
+DELIMITER ;

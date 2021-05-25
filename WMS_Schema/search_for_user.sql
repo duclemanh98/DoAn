@@ -269,3 +269,79 @@ BEGIN
     ORDER BY in_number DESC, out_number DESC;
 END &&
 DELIMITER ;
+
+###--------------------
+## Search in paper from productID and product name
+DELIMITER &&
+DROP PROCEDURE IF EXISTS search_in_paper_with_product;
+CREATE PROCEDURE search_in_paper_with_product(IN productID INT, IN productName VARCHAR(100))
+BEGIN
+	SELECT DISTINCT InPaperTable.id AS id, InPaperTable.supplier, InPaperTable.created_at, 
+		InPaperTable.cur_status, InPaperTable.paper_desc
+    FROM FactTable
+    JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
+    JOIN InPaperTable ON FactTable.in_paper_id = InPaperTable.id
+    WHERE FactTable.id = productID AND ProductTypeTable.cur_name LIKE CONCAT("%", productName, "%");
+END &&
+DELIMITER ;
+
+###--------------------
+## Search in paper from product name
+DELIMITER &&
+DROP PROCEDURE IF EXISTS search_in_paper_with_productname;
+CREATE PROCEDURE search_in_paper_with_productname(IN productName VARCHAR(100))
+BEGIN
+	SELECT DISTINCT InPaperTable.id AS id, InPaperTable.supplier, InPaperTable.created_at, 
+					InPaperTable.cur_status, InPaperTable.paper_desc
+    FROM FactTable
+    JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
+    JOIN InPaperTable ON FactTable.in_paper_id = InPaperTable.id
+    WHERE ProductTypeTable.cur_name LIKE CONCAT("%", productName, "%");
+END &&
+DELIMITER ;
+
+###--------------------
+## Search out paper from productID and product name
+DELIMITER &&
+DROP PROCEDURE IF EXISTS search_out_paper_with_product;
+CREATE PROCEDURE search_out_paper_with_product(IN productID INT, IN productName VARCHAR(100))
+BEGIN
+	DROP TEMPORARY TABLE IF EXISTS temp_table;
+    CREATE TEMPORARY TABLE temp_table AS (
+		SELECT FactTable.id, FactTable.product_type_id, ProductTypeTable.cur_name,
+			SingleOutProductTable.paper_id
+		FROM FactTable
+        JOIN ProductTypeTable ON ProductTypeTable.id = FactTable.product_type_id
+        JOIN SingleOutProductTable ON SingleOutProductTable.id = FactTable.id
+        WHERE FactTable.id = productID AND ProductTypeTable.cur_name LIKE CONCAT("%", productName, "%")
+    );
+    
+    SELECT DISTINCT OutPaperTable.id, OutPaperTable.buyer, OutPaperTable.created_at, 
+					OutPaperTable.cur_status, OutPaperTable.paper_desc
+    FROM OutPaperTable
+    JOIN temp_table ON temp_table.paper_id = OutPaperTable.id;
+END &&
+DELIMITER ;
+
+###--------------------
+## Search out paper from product name
+DELIMITER &&
+DROP PROCEDURE IF EXISTS search_out_paper_with_productname;
+CREATE PROCEDURE search_out_paper_with_productname(IN productName VARCHAR(100))
+BEGIN
+	DROP TEMPORARY TABLE IF EXISTS temp_table;
+    CREATE TEMPORARY TABLE temp_table AS (
+		SELECT FactTable.id, FactTable.product_type_id, ProductTypeTable.cur_name,
+			SingleOutProductTable.paper_id
+		FROM FactTable
+        JOIN ProductTypeTable ON ProductTypeTable.id = FactTable.product_type_id
+        JOIN SingleOutProductTable ON SingleOutProductTable.id = FactTable.id
+        WHERE ProductTypeTable.cur_name LIKE CONCAT("%", productName, "%")
+    );
+    
+    SELECT DISTINCT OutPaperTable.id, OutPaperTable.buyer, OutPaperTable.created_at, 
+					OutPaperTable.cur_status, OutPaperTable.paper_desc
+    FROM OutPaperTable
+    JOIN temp_table ON temp_table.paper_id = OutPaperTable.id;
+END &&
+DELIMITER ;

@@ -81,4 +81,9 @@ CALL ShowDetailCheckingPaper(1);
 CALL DisplayAllInventoryPaper();
 
 SELECT COUNT(*) FROM LocationTable WHERE building = 'J';
+SELECT * FROM inventorycheckingproducttable;
+SELECT * FROM inventorycheckingpapertable;
+
+
+
 
