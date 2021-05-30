@@ -179,6 +179,47 @@ app.post('/userDelete', async(req, res) => {
     }
 })
 
+/*
+ *  /getAllUsers
+ *  @brief: API to get all user
+ *  req: none
+ * 
+ *  @retval:    
+ *  username
+ *  role
+ */
+
+app.post('/getAllUsers', function(req, res){
+    console.log('Get all users');
+    pool.query('SELECT username, auth AS role FROM UserTable', function(err, rows){
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows)));
+    })
+})
+
+/*
+ *  /updateAdmin
+ *  @brief: API to update from User to Admin
+ *  req: username
+ * 
+ *  @retval:    
+ *  true or false
+ */
+app.post('/updateAdmin', function(req, res){
+    console.log('Update to Admin, username is: '+req.body.username);
+    try {
+        pool.query('CALL updateUserRole(?)', [req.body.username], function(err, rows) {
+            if(err) throw err;
+            return res.json(true);
+        })
+    }
+    catch(err) {
+        return res.json(false);
+    }
+})
+
+
+
 //------------------API for Creating In Paper----------------------//
 
 /*

@@ -56,5 +56,16 @@ END &&
 DELIMITER ;
 #-----------------
 #--------------
+## Update user to admin
+DELIMITER &&
+DROP PROCEDURE IF EXISTS updateUserRole;
+CREATE PROCEDURE updateUserRole(IN user_name VARCHAR(50))
+BEGIN
+	UPDATE UserTable SET auth = 'Admin' WHERE username = user_name;
+END &&
+DELIMITER ;
+
 ### END OF FILE ###
 SELECT * FROM UserTable;
+
+CALL updateUserRole('LeTao');
