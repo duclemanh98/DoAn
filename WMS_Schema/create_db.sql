@@ -9,6 +9,8 @@ USE wms_db;
 #    auth CHAR(5) NOT NULL DEFAULT 'users'
 #    #auth has 2 values: admin or user
 #);
+SELECT * FROM UserTable;
+
 
 CREATE TABLE LocationTable (
 	id INT auto_increment PRIMARY KEY, 
@@ -30,6 +32,7 @@ CREATE TABLE ProductTypeTable (
     max_amount INT NOT NULL,
     pareto_type CHAR(1) DEFAULT 'C'					#this type includes 3 value: A, B or C
 );
+
 
 CREATE TABLE ProductTypeAnalysis (
 	id VARCHAR(15) NOT NULL UNIQUE,
@@ -66,7 +69,7 @@ CREATE TABLE OutPaperTable (
 	buyer VARCHAR(100),
     created_at TIMESTAMP DEFAULT NOW(),
     cur_status CHAR(1) NOT NULL DEFAULT 'p',
-    paper_desc VARCHAR(100) NOT NULL DEFAULT ''
+    paper_desc VARCHAR(1000) NOT NULL DEFAULT ''
 );
 
 CREATE TABLE TotalOutProductTable (
@@ -116,7 +119,7 @@ CREATE TABLE InventoryCheckingPaperTable (
     first_location INT,
     last_location INT,
     cur_status CHAR(1) DEFAULT 'p',
-    paper_desc VARCHAR(100) DEFAULT '',
+    paper_desc VARCHAR(1000) DEFAULT '',
     in_status INT DEFAULT 0,
     out_status INT DEFAULT 0,
     FOREIGN KEY (first_location) REFERENCES LocationTable(id),
@@ -167,5 +170,43 @@ BEGIN
 		SET amount = amount - 1;
         ITERATE loop_label;
 	END LOOP;
+END &&
+DELIMITER ;
+
+###-----------------------------------------
+DELIMITER &&
+DROP PROCEDURE IF EXISTS add_bar_code_with_name;
+CREATE PROCEDURE add_bar_code_with_name(IN productName VARCHAR(100), IN paper INT, IN amount INT)
+BEGIN 
+	DECLARE typeID VARCHAR(15);
+    SELECT id INTO typeID FROM ProductTypeTable WHERE cur_name = productName;
+    CALL add_bar_code(typeID, paper, amount);
+END &&
+DELIMITER ;
+
+###------------------------------------\
+DELIMITER &&
+DROP PROCEDURE IF EXISTS add_product_type;
+CREATE PROCEDURE add_product_type(IN typeID VARCHAR(15), IN productName VARCHAR(100), IN perbox INT)
+BEGIN
+	INSERT INTO ProductTypeTable(id, cur_name, max_amount) VALUES (typeID, productName, perbox);
+END &&
+DELIMITER ;
+
+SELECT * FROM id_barcode;
+
+#-------------------------------------------
+### Procedure to display product barcode of 1 in paper
+DELIMITER &&
+DROP PROCEDURE IF EXISTS DisplayBarcode;
+CREATE PROCEDURE DisplayBarcode(IN paperID INT)
+BEGIN
+	SELECT CONCAT(id_barcode.id, "-", id_barcode.product_type_id) AS product_id,
+		id_barcode.product_type_id,
+		ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox
+    FROM id_barcode
+    JOIN ProductTypeTable ON id_barcode.product_type_id = ProductTypeTable.id
+    WHERE id_barcode.paper_id = paperID
+    ORDER BY id_barcode.id;
 END &&
 DELIMITER ;

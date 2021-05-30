@@ -85,5 +85,11 @@ SELECT * FROM inventorycheckingproducttable;
 SELECT * FROM inventorycheckingpapertable;
 
 
+CALL UpdatePaperDescCheckingPaper(1,'test');
+
+
+
+
+
 
 

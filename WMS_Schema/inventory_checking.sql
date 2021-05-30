@@ -100,6 +100,30 @@ END &&
 DELIMITER ;
 
 #--------------------------------------
+#### Update paper desc for checking paper
+DELIMITER &&
+DROP PROCEDURE IF EXISTS UpdatePaperDescCheckingPaper;
+CREATE PROCEDURE UpdatePaperDescCheckingPaper(IN paperID INT, IN paperDesc VARCHAR(1000))
+BEGIN
+	DECLARE newDesc VARCHAR(1000);
+    DECLARE finish_check CHAR(1);
+    
+    SELECT cur_status INTO finish_check FROM InventoryCheckingPaperTable WHERE id = paperID;
+    
+    IF finish_check != 'c' THEN
+		SELECT paper_desc INTO newDesc FROM InventoryCheckingPaperTable WHERE id = paperID;
+        IF ISNULL(newDesc) = 1 THEN
+			SET newDesc = paperDesc;
+		ELSE
+			SET newDesc = CONCAT(newDesc, "\n", paperDesc);
+		END IF;
+        
+        UPDATE InventoryCheckingPaperTable SET paper_desc = newDesc WHERE id = paperID;
+    END IF;
+END &&
+DELIMITER ;
+
+#--------------------------------------
 #### Procedure to complete CheckingPaper
 DELIMITER &&
 DROP PROCEDURE IF EXISTS ConfirmInventoryCheckingPaper;

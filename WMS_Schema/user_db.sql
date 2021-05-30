@@ -14,7 +14,6 @@ CREATE TABLE UserTable (
     #auth has 2 values: admin or user
 );
 
-CALL add_user('newbie1', 'tester', 'admin');
 SELECT * FROM UserTable;
 
 ###### Procedure to Deal with all action related to users

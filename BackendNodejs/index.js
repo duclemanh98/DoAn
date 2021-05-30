@@ -27,8 +27,16 @@ function check_login(req) {
     return new Promise(resolve => {
         pool.query("CALL check_login(?, ?, @checking_val);SELECT @checking_val AS retval",[req.body.username, req.body.password], function(err, results){
             if(err) throw err;
-            if(results[1][0].retval == 0) resolve(false);
-            else resolve(true);
+            var checkingObject = {status: false, userRole: ''};
+            if(results[1][0].retval == 0) resolve(checkingObject);
+            else {
+                checkingObject.status = true;
+                pool.query('SELECT auth FROM UserTable WHERE username = ?', [req.body.username], function(err, rows){
+                    if(err) throw err;
+                    checkingObject.userRole = rows[0].auth;
+                    resolve(checkingObject);  
+                })
+            }
         });
     })
 }
@@ -52,21 +60,13 @@ function check_duplicate(json_obj) {
 }
 
 /*
- *  This function will convert date string DD/MM/YYYY to date object
- *  @param:     array: array of date
- *  @retval:    date object
+ *  This function check if date is valid (DD/MM/YYYY)
+ *  @param: array of date
+ *  @retval: true or false
  */
-function date_convert(date_arr) {
-    var dateParts;
-    if(date_arr.includes("-")) {
-        var dateParts = date_arr.split("-");
-    } 
-    else if(date_arr.includes("/")){
-        var dateParts = date_arr.split("/");
-    }
-    else {
-        return new Date;
-    }
+
+function checkValidDate(date_arr) {
+    var dateParts = date_arr.split("/");
     var d = parseInt(dateParts[0], 10)
     var m = parseInt(dateParts[1], 10)
     var y = parseInt(dateParts[2], 10)
@@ -74,9 +74,24 @@ function date_convert(date_arr) {
     var date = new Date(y,m-1,d);
 
     if (date.getFullYear() == y && date.getMonth() + 1 == m && date.getDate() == d) {
-        return date;
+        return true;
     }
-    else return new Date;
+    else return false;
+}
+
+/*
+ *  This function will convert date string DD/MM/YYYY to date object
+ *  @param:     array: array of date
+ *  @retval:    date object
+ */
+function date_convert(date_arr) {
+    var dateParts = date_arr.split("/");
+    var d = parseInt(dateParts[0], 10)
+    var m = parseInt(dateParts[1], 10)
+    var y = parseInt(dateParts[2], 10)
+    
+    var date = new Date(y,m-1,d);
+    return date;
 }
 
 /*
@@ -109,19 +124,18 @@ function date_convert(date_arr) {
 
 //------------------API for User----------------------//
 
-/*
+/*  
+ *  /userLogin
  *  @brief: API to check user login, request contain json included username and password
+ * 
+ *  @retval:
+ *  status:         true or false
+ *  userRole:       Users or Admin
  */
 app.post('/userLogin', async(req, res) => {
     console.log(req.body.username, req.body.password);
-    try {
-        var query_result = await check_login(req);
-        //console.log(query_result);
-        return res.json(query_result); 
-    }
-    catch(error) {
-        console.log(error);
-    }
+    var checkingObject = await check_login(req);
+    res.send(checkingObject);
 });
 
 
@@ -131,13 +145,19 @@ app.post('/userLogin', async(req, res) => {
  */
 app.post('/addUser', function(req, res){
     //console.log(req);
-    pool.query('CALL add_user(?,?,?)',[req.body.username, req.body.password, req.body.role], function(err, results){
-        if(err) {
-            return res.json(false);
-        }
-        console.log("Add successfully");
-        return (res.json(true));
-    });
+    if(req.body.role == '') req.body.role = 'User';
+    try {
+        pool.query('CALL add_user(?,?,?)',[req.body.username, req.body.password, req.body.role], function(err){
+            if(err) {
+                return res.json(false);
+            }
+            console.log("Add successfully");
+            return (res.json(true));
+        });
+    }
+    catch(err) {
+        return res.json(false);
+    }
 });
 
 /*
@@ -168,8 +188,13 @@ app.post('/userDelete', async(req, res) => {
  *  @retval: ID of paper
  */
 app.post('/inPaperCreate', function(req, res){
-    var dateObject = date_convert(req.body.created_time);
-    console.log(req.body);
+    var dateObject;
+    if(checkValidDate(req.body.created_time)) {
+        dateObject = date_convert(req.body.created_time);
+    }
+    else dateObject = new Date;
+
+    console.log("Create New Import Paper");
     pool.query("CALL create_in_paper_with_date(?,?,?)", [req.body.store, dateObject, req.body.description], function(err){
         if(err) return res.json(0);
         pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
@@ -204,6 +229,9 @@ app.post('/addInProduct', async(req, res) => {
         for(var i=0;i<length;i++) {
             pool.query('CALL add_product_in_paper(?,?,?)',[req.body.paper_id, prodFile[i].nameGet, prodFile[i].boxQuantityGet], function(err, results){
                 if(err) return res.json(false);
+                pool.query('CALL add_bar_code_with_name(?,?,?'),[prodFile[i].nameGet, req.body.paper_id, prodFile[i].boxQuantityGet], function(err) {
+                    if(err) return res.json(false);
+                }
             })
         }
         return res.json(true);
@@ -212,7 +240,30 @@ app.post('/addInProduct', async(req, res) => {
 
 
 /*
+ *  /addProductType
+ *  @brief: add product type
+ *  req:
+ *      typeID
+ *      ProductName
+ *      perbox
+ *  @retval:    true if successfully created, else false
+ */
+
+app.post('/addProductType', function(req, res){
+    console.log("Add Product with id: "+req.body.typeID);
+    pool.query('CALL add_product_type(?,?,?)', [req.body.typeID, req.body.productName, req.body.perbox], function(err, rows){
+        if(err) return res.json(false);
+        return res.json(true);
+    })
+})
+
+/*
+ *  /getProductType   
  *  Note: getting product name and product/box
+ *  @retval:
+ *      type_id
+ *      cur_name
+ *      max_amount
  */
 
 app.post('/getProductType', function(req, res) {
@@ -243,7 +294,7 @@ app.post('/displayAllInPaper', function(req, res){
     pool.query('SELECT * FROM InPaperTable', function(err, results){
         if(err) throw err;
         for(var i = 0; i < results.length; i++){
-            // results[i].created_at = results[i].created_at.split(' ')[0];
+            results[i].created_at = results[i].created_at.split(' ')[0];
         }
         res.send(JSON.parse(JSON.stringify(results)));
     })
@@ -438,14 +489,19 @@ app.post('/displayProductLeft', function(req, res) {
  *  paper_id:               ---ID of paper
  */
 app.post('/createOutPaper', function(req, res){
-    var dateObject = date_convert(req.body.createDate);
-        console.log(req.body);
-        pool.query("CALL create_out_paper_with_date(?,?,?)", [req.body.buyer, dateObject, req.body.paperDesc], function(err){
-            if(err) return res.json(0);
-            pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
-                if(err) throw err;
-                return res.json(rows[0].paper_id);
-            
+    console.log("Create new export paper");
+    var dateObject;
+    if(checkValidDate(req.body.createDate)) {
+        dateObject = date_convert(req.body.createDate);
+    }
+    else dateObject = new Date;
+    
+    console.log(req.body);
+    pool.query("CALL create_out_paper_with_date(?,?,?)", [req.body.buyer, dateObject, req.body.paperDesc], function(err){
+        if(err) return res.json(0);
+        pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
+            if(err) throw err;
+            return res.json(rows[0].paper_id);
         })
     })
 })
@@ -498,7 +554,7 @@ app.post('/displayAllOutPaper', function(req, res){
         if(err) throw err;
         for(var i = 0; i < rows.length; i++){
             console.log(rows[i].created_at);
-            // rows[i].created_at = rows[i].created_at.split(' ')[0];
+            rows[i].created_at = rows[i].created_at.split(' ')[0];
         }
         res.send(JSON.parse(JSON.stringify(rows)));
     })
@@ -650,15 +706,25 @@ app.post('/confirmOutScanProduct', async(req, res) => {
 app.post('/searchImportExport', function(req, res) {
     var first_date, last_date;
 
-    if(req.body.firstDate == '') {
-        first_date = date_convert('01/01/1975');
-    } 
-    else first_date = date_convert(req.body.firstDate);
+    // if(req.body.firstDate == '') {
+    //     first_date = date_convert('01/01/1975');
+    // } 
+    // else first_date = date_convert(req.body.firstDate);
 
-    if(req.body.lastDate == '') {
-        last_date = date_convert('31/12/2099');
+    // if(req.body.lastDate == '') {
+    //     last_date = date_convert('31/12/2099');
+    // }
+    // else last_date = date_convert(req.body.lastDate);
+    if(checkValidDate(req.body.firstDate)) {
+        first_date = date_convert(req.body.firstDate);
     }
-    else last_date = date_convert(req.body.lastDate);
+    else first_date = date_convert('01/01/1975');
+
+    if(checkValidDate(req.body.lastDate)) {
+        last_date = date_convert(req.body.lastDate);
+    }
+    else last_date = date_convert('31/12/2099');
+
     console.log("Searching import and export amount between "+ first_date + " and " + last_date);
     // var first_date = date_convert(req.body.firstDate);
     // var last_date = date_convert(req.body.lastDate);
@@ -886,6 +952,7 @@ function UpdateAmountSystem(perProductInfo, ioChecking, paperID) {
  *  productInfo:
  *      productID:      --- id of product
  *      mis_amount:     --- number of products on system
+ *  paperDesc:          ---description
  * 
  *  @retval: none
  *  
@@ -901,9 +968,14 @@ app.post('/updateInSystemAmount', async(req, res) => {
         if(err) throw err;
         pool.query('CALL CheckBlankIOChecking(?)', [req.body.paperID], function(err, rows){
             if(err) throw err;
-            pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
-                if(err) throw err;
-            })
+            if(req.body.paperDesc != '') {
+                pool.query('CALL UpdatePaperDescCheckingPaper(?,?)', [req.body.paperID,  req.body.paperDesc], function(err, rows){
+                    if(err) throw err;
+                    pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
+                        if(err) throw err;
+                    })
+                })
+            }  
         })   
     })
 })
@@ -916,7 +988,7 @@ app.post('/updateInSystemAmount', async(req, res) => {
  *  productInfo:
  *      productID:      --- id of product
  *      mis_amount:     --- number of products on system
- * 
+ *  paperDesc:          ---description
  *  @retval: none
  *  
  */
@@ -930,9 +1002,14 @@ app.post('/updateOutSystemAmount', async(req, res) => {
         if(err) throw err;
         pool.query('CALL CheckBlankIOChecking(?)', [req.body.paperID], function(err, rows){
             if(err) throw err;
-            pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
-                if(err) throw err;
-            })
+            if(req.body.paperDesc != '') {
+                pool.query('CALL UpdatePaperDescCheckingPaper(?,?)', [req.body.paperID,  req.body.paperDesc], function(err, rows){
+                    if(err) throw err;
+                    pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
+                        if(err) throw err;
+                    })
+                })
+            }  
         })   
     })
 })
@@ -942,9 +1019,18 @@ function UpdateInventoryProduct(perProductFile, paperID){
     return new Promise(resolve => {
         if(perProductFile.cur_status == 'h') {
             pool.query('CALL UpdateIOInventoryChecking(?,?,?,?)', [perProductFile.productID, paperID, perProductFile.sys_amount, perProductFile.real_amount], function(err){
-                if(err) throw err;
+                if(err) resolve(false);
                 resolve(true);
             })
+        }
+        //resolve(true);
+    })
+}
+
+function processUpdateInventory(productFile, paperID) {
+    return new Promise(async(resolve) => {
+        for(const item of productFile) {
+            await UpdateInventoryProduct(item, paperID);
         }
         resolve(true);
     })
@@ -968,13 +1054,12 @@ function UpdateInventoryProduct(perProductFile, paperID){
 app.post('/confirmInventoryCheckingPaper', async(req, res) => {
     console.log('Confirm Inventory Checking Paper '+req.body.paperID);
     var productFile = req.body.productInfo;
-
-    for(var i = 0; i < productFile.length; i++) {
-        await UpdateInventoryProduct(productFile[i], req.body.paperID);
-    }
+    var waitingValue = false;
+    waitingValue = await processUpdateInventory(productFile, req.body.paperID);
+    
     pool.query('CALL ConfirmInventoryCheckingPaper(?)', [req.body.paperID], function(err){
         if(err) throw err;
-    })
+    }) 
 })
 
 
@@ -1032,6 +1117,28 @@ app.post('/detailOutInventoryPaper', function(req, res){
     })
 })
 
+/*******************************/
+/**--- Display Barcode ---*/
+
+/*
+ *  /displayBarcodePaper
+ *  @brief: display barcode of one import paper
+ *  req: paperID: id of paper
+ *  
+ *  @retval
+ *  product_id:         --- code of 1 box
+ *  product_type_id:    --- code of type
+ *  cur_name:           --- name of product
+ *  perbox:             --- amount of product/box
+ */ 
+
+app.post('/displayBarcodePaper', function(req, res) {
+    console.log('Display Barcode from Paper '+req.body.paperID);
+    pool.query('CALL DisplayBarcode(?)', [req.body.paperID], function(err, rows){
+        if(err) throw err;
+        res.send(JSON.parse(JSON.stringify(rows[0])));
+    })
+})
 
 
 /*
