@@ -3,18 +3,18 @@
 #----------------------------------------------------------
 DELIMITER &&
 DROP PROCEDURE IF EXISTS create_in_paper_with_date;
-CREATE PROCEDURE create_in_paper_with_date(IN supply VARCHAR(100), IN create_time DATETIME, IN in_desc VARCHAR(100))
+CREATE PROCEDURE create_in_paper_with_date(IN supply VARCHAR(100), IN create_time DATETIME, IN in_desc VARCHAR(100), IN createUser VARCHAR(50))
 BEGIN
-	INSERT INTO InPaperTable(supplier, created_at, paper_desc) VALUES (supply, DATE(create_time), in_desc);
+	INSERT INTO InPaperTable(supplier, created_at, paper_desc, create_user) VALUES (supply, DATE(create_time), in_desc, createUser);
 END &&
 DELIMITER ;
 
 #----------------------------------------------------------
 DELIMITER &&
 DROP PROCEDURE IF EXISTS create_in_paper_wo_date;
-CREATE PROCEDURE create_in_paper_wo_date(IN supply VARCHAR(100))
+CREATE PROCEDURE create_in_paper_wo_date(IN supply VARCHAR(100), IN createUser VARCHAR(50))
 BEGIN
-	INSERT INTO InPaperTable(supplier) VALUES (supply);
+	INSERT INTO InPaperTable(supplier, create_user) VALUES (supply, createUser);
 END &&
 DELIMITER ;
 
@@ -28,6 +28,7 @@ BEGIN
     SELECT id INTO product_type FROM ProductTypeTable
     WHERE ProductTypeTable.cur_name = product_name;
 	INSERT INTO InProductTable(id, paper_id, box_amount) VALUES (product_type, paper, amount);
+    CALL add_bar_code_with_name(product_name, paper, amount);
 END &&
 DELIMITER ;
 
@@ -44,12 +45,23 @@ DELIMITER ;
 ### update status of in paper/use for user when submit in paper
 DELIMITER &&
 DROP PROCEDURE IF EXISTS complete_in_paper;
-CREATE PROCEDURE complete_in_paper(IN paper INT)
+CREATE PROCEDURE complete_in_paper(IN paper INT, IN confirmUser VARCHAR(50))
 BEGIN
 	DECLARE total_box INT;
     DECLARE scan_box INT;
     DECLARE location_null_count INT;
     DECLARE location_temp_count INT;
+    DECLARE username VARCHAR(500);
+	DECLARE temp_name VARCHAR(500);
+    
+    SELECT confirm_user INTO username FROM InPaperTable WHERE id = paper;
+    IF ISNULL(username) = 1 THEN
+		UPDATE InPaperTable SET confirm_user = confirmUser WHERE id = paper;
+	ELSE
+		SELECT confirm_user INTO temp_name FROM InPaperTable WHERE id = paper;
+        SET temp_name = CONCAT(temp_name, "\n", confirmUser);
+        UPDATE InPaperTable SET confirm_user = temp_name WHERE id = paper;
+    END IF;
     
     SELECT SUM(box_amount) INTO total_box FROM InProductTable
     WHERE paper = InProductTable.paper_id;

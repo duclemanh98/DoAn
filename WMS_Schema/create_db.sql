@@ -50,7 +50,10 @@ CREATE TABLE InPaperTable (
     #receive_staff VARCHAR(50) NOT NULL DEFAULT '',
     created_at TIMESTAMP DEFAULT NOW(),
 	cur_status CHAR(1) NOT NULL DEFAULT 'p',
-    paper_desc VARCHAR(100) NOT NULL DEFAULT ''
+    paper_desc VARCHAR(100) NOT NULL DEFAULT '',
+    create_user VARCHAR(50),
+    confirm_user VARCHAR(500) DEFAULT '',
+    FOREIGN KEY (create_user) REFERENCES UserTable(username)
     #cur_status has 2 values: 'p' = pending or 'c' = complete
 );
 
@@ -69,7 +72,10 @@ CREATE TABLE OutPaperTable (
 	buyer VARCHAR(100),
     created_at TIMESTAMP DEFAULT NOW(),
     cur_status CHAR(1) NOT NULL DEFAULT 'p',
-    paper_desc VARCHAR(1000) NOT NULL DEFAULT ''
+    paper_desc VARCHAR(1000) NOT NULL DEFAULT '',
+	create_user VARCHAR(50),
+    confirm_user VARCHAR(500) DEFAULT '',
+	FOREIGN KEY (create_user) REFERENCES UserTable(username)
 );
 
 CREATE TABLE TotalOutProductTable (
@@ -110,7 +116,8 @@ CREATE TABLE id_barcode (
 	id INT auto_increment PRIMARY KEY,
     product_type_id VARCHAR(15),
     paper_id INT NOT NULL,
-    FOREIGN KEY (product_type_id) references ProductTypeTable(id)
+    FOREIGN KEY (product_type_id) references ProductTypeTable(id),
+    FOREIGN KEY (paper_id) REFERENCES InPaperTable(id)
 );
 
 CREATE TABLE InventoryCheckingPaperTable (
@@ -122,8 +129,10 @@ CREATE TABLE InventoryCheckingPaperTable (
     paper_desc VARCHAR(1000) DEFAULT '',
     in_status INT DEFAULT 0,
     out_status INT DEFAULT 0,
+    create_user VARCHAR(50),
     FOREIGN KEY (first_location) REFERENCES LocationTable(id),
-    FOREIGN KEY (last_location) REFERENCES LocationTable(id)
+    FOREIGN KEY (last_location) REFERENCES LocationTable(id),
+    FOREIGN KEY (create_user) REFERENCES UserTable(username)
 );
 
 CREATE TABLE InventoryCheckingProductTable (
@@ -184,6 +193,7 @@ BEGIN
 END &&
 DELIMITER ;
 
+
 ###------------------------------------\
 DELIMITER &&
 DROP PROCEDURE IF EXISTS add_product_type;
@@ -210,3 +220,4 @@ BEGIN
     ORDER BY id_barcode.id;
 END &&
 DELIMITER ;
+

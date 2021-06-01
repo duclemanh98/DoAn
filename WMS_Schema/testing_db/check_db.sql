@@ -10,6 +10,7 @@ SELECT * FROM ProductTypeTable;
 UPDATE inpapertable SET cur_status = 'p' WHERE id = 2;
 SELECT * FROM LocationTable WHERE bin_status != 'free';
 
+SELECT * FROM id_barcode;
 #### Delete data from table
 #DELETE FROM InProductTable;
 #DELETE FROM InPaperTable WHERE id > 1;

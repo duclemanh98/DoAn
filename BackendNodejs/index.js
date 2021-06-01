@@ -162,20 +162,19 @@ app.post('/addUser', function(req, res){
 
 /*
  *  @brief: API to delete user from database
- *  request: json include: username, password
+ *  request: json include: username
  * 
  *  Note: change return value according to display
  */
 app.post('/userDelete', async(req, res) => {
-    var query_result = await check_login(req);
-    if(query_result == false) {
-        return res.json("No account");
-    }
-    else {
-        pool.query('CALL delete_user(?,?)',[req.body.username, req.body.password], function(err){
+    try {
+        pool.query('CALL delete_user(?)',[req.body.username], function(err){
             if(err) throw err;
-            return res.json("Success");
+            return;
         });
+    }
+    catch(err) {
+        return;
     }
 })
 
@@ -224,7 +223,11 @@ app.post('/updateAdmin', function(req, res){
 
 /*
  *  @brief: API to create new in paper
- *  request: json file include supplier and created_date, paperDesc
+ *  request: json file include 
+ *  supplier 
+ *  created_date
+ *  paperDesc
+ *  userName:               ---create user
  * 
  *  @retval: ID of paper
  */
@@ -236,7 +239,7 @@ app.post('/inPaperCreate', function(req, res){
     else dateObject = new Date;
 
     console.log("Create New Import Paper");
-    pool.query("CALL create_in_paper_with_date(?,?,?)", [req.body.store, dateObject, req.body.description], function(err){
+    pool.query("CALL create_in_paper_with_date(?,?,?,?)", [req.body.store, dateObject, req.body.description, req.body.userName], function(err){
         if(err) return res.json(0);
         pool.query("SELECT MAX(id) AS paper_id FROM InPaperTable", function(err, result) {
             if(err) throw err;
@@ -257,26 +260,28 @@ app.post('/inPaperCreate', function(req, res){
 app.post('/addInProduct', async(req, res) => {
     //console.log(req.body.paper_id);
     // console.log(req.body);
-    var prodFile = JSON.parse(JSON.stringify(req.body.product_info));
-    //console.log(product_file);
-    console.log(prodFile);
+    // try {
+        var prodFile = req.body.product_info;
+        //console.log(product_file);
+        // console.log(prodFile);
+        
+        var length = req.body.product_info.length;
     
-    var length = Object.keys(req.body.product_info).length;
-
-    var duplicate_check = await check_duplicate(prodFile);
-    if(duplicate_check == true) return res.json(false);         //The array has duplicate products
-    else {
-        console.log("No duplicate product");
-        for(var i=0;i<length;i++) {
-            pool.query('CALL add_product_in_paper(?,?,?)',[req.body.paper_id, prodFile[i].nameGet, prodFile[i].boxQuantityGet], function(err, results){
-                if(err) return res.json(false);
-                pool.query('CALL add_bar_code_with_name(?,?,?'),[prodFile[i].nameGet, req.body.paper_id, prodFile[i].boxQuantityGet], function(err) {
+        var duplicate_check = await check_duplicate(prodFile);
+        if(duplicate_check == true) return res.json(false);         //The array has duplicate products
+        else {
+            console.log("No duplicate product");
+            for(var i=0;i<length;i++) {
+                pool.query('CALL add_product_in_paper(?,?,?)',[req.body.paper_id, prodFile[i].nameGet, prodFile[i].boxQuantityGet], function(err, results){
                     if(err) return res.json(false);
-                }
-            })
+                })
+            }
+            return res.json(true);
         }
-        return res.json(true);
-    }
+    // }
+    // catch(err) {
+    //     return res.json(false);
+    // }
 })
 
 
@@ -480,13 +485,33 @@ app.post('/displayInScannedProduct', function(req, res){
  *  @brief: API to confirm a paper
  *  req includes:
  *  paperID:    ID of in paper
+ *  userName:   confirm user
  *
  * 
  *  @retval: value: 'p': pending or 'c': complete
  */
-app.post('/confirmInScanPaper', function(req, res){
+
+function checkUserDuplicateInPaper(userName, paperID) {
+    return Promise(resolve => {
+        pool.query('SELECT confirm_user FROM InPaperTable WHERE id = ?', [paperID], function(err, rows) {
+            if(err) throw err;
+            var confirmName = rows[0].confirm_user.split("\n");
+            for(var i = 0; i < confirmName.length; i++) {
+                if (userName = confirmName[i]) resolve(true);
+            }
+            resolve(false);     ///=> no duplicate
+        })
+    })
+}
+
+app.post('/confirmInScanPaper', async(req, res) => {
     console.log("Confirm in paper "+req.body.paperID);
-    pool.query('CALL complete_in_paper(?)', [req.body.paperID], function(err){
+    var confirmName;
+    if(await checkUserDuplicateInPaper(req.body.userName, req.body.paperID)) {
+        confirmName = '';
+    }
+    else confirmName = req.body.userName;
+    pool.query('CALL complete_in_paper(?,?)', [req.body.paperID, confirmName], function(err){
         if(err) throw err;
         pool.query('SELECT cur_status FROM InPaperTable WHERE id = ?',[req.body.paperID], function(err, rows) {
             if(err) throw err;
@@ -525,6 +550,7 @@ app.post('/displayProductLeft', function(req, res) {
  *  createDate:             ---date created
  *  buyer:                  ---buyer of product
  *  paperDesc:              ---description
+ *  userName:               ---create user
  * 
  *  @retval:
  *  paper_id:               ---ID of paper
@@ -538,7 +564,7 @@ app.post('/createOutPaper', function(req, res){
     else dateObject = new Date;
     
     console.log(req.body);
-    pool.query("CALL create_out_paper_with_date(?,?,?)", [req.body.buyer, dateObject, req.body.paperDesc], function(err){
+    pool.query("CALL create_out_paper_with_date(?,?,?,?)", [req.body.buyer, dateObject, req.body.paperDesc, req.body.userName], function(err){
         if(err) return res.json(0);
         pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
             if(err) throw err;
@@ -709,16 +735,39 @@ app.post('/displayOutScannedProduct', function(req, res){
  *      typeID              ---- type code of product
  *      amount:             ---- selected amount of product
  *      cur_status:         ---- check if product is scanned or not
- * 
+ *  userName:           ---- confirm user
  *  @retval: true/false
  *  
  */
 
+function checkUserDuplicateOutPaper(userName, paperID) {
+    return Promise(resolve => {
+        pool.query('SELECT confirm_user FROM OutPaperTable WHERE id = ?', [paperID], function(err, rows) {
+            if(err) throw err;
+            var confirmName = rows[0].confirm_user.split("\n");
+            for(var i = 0; i < confirmName.length; i++) {
+                if (userName = confirmName[i]) resolve(true);
+            }
+            resolve(false);     ///=> no duplicate
+        })
+    })
+}
+
 app.post('/confirmOutScanProduct', async(req, res) => {
     console.log("Confirm out paper "+req.body.paperID);
     var prodFile = req.body.productInfo;
+    var confirmName;
+    if(await checkUserDuplicateOutPaper(req.body.userName, req.body.paperID)) {
+        confirmName = '';
+    }
+    else confirmName = req.body.userName;
+
+    pool.query('CALL confirmUserOutPaper(?,?)', [req.body.paperID, confirmName], function(err, rows){
+        if(err) throw err;
+    });
+
     for(var i = 0; i < req.body.productInfo.length; i++) {
-        pool.query('CALL scan_out_product(?,?,?,?)', [prodFile[i].productID, prodFile[i].amount, req.body.paperID, prodFile[i].typeID], function(err) {
+        pool.query('CALL scan_out_product(?,?,?)', [prodFile[i].productID, prodFile[i].amount, req.body.paperID, prodFile[i].typeID], function(err) {
             if(err) throw err;
         }) 
     }
@@ -843,7 +892,7 @@ app.post('/checkValidLocation', function(req, res){
  */
 function createInventoryChecking(req) {
     return new Promise(resolve => {
-        pool.query('CALL InventoryCheckingPaperCreate(?,?,?,?)',[req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom, req.body.paperDesc], function(err) {
+        pool.query('CALL InventoryCheckingPaperCreate(?,?,?,?,?)',[req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom, req.body.paperDesc, req.body.userName], function(err) {
             if(err) throw err;
             pool.query('SELECT MAX(id) AS id FROM InventoryCheckingPaperTable', function(err, rows) {
                 if(err) throw err;
@@ -884,6 +933,7 @@ function addPerProductToInventory(perProductFile, paperID) {
  *  buildingFloor:          ---- 1 2 3
  *  buildingRoom:           ---- 
  *  paperDesc:              ---- description of paper
+ *  userName:               ---- create User
  * 
  *  @retval:
  *  location_id
@@ -965,6 +1015,7 @@ app.post('/detailInventoryCheckingPaper', function(req, res) {
  *  building_room
  *  cur_status:           --- 'c' - complete and correct / 'p' pending / m: complete but missing products
  *  paper_desc:         description of paper
+ *  create_user:        create_user
  */
 
 app.post('/displayAllInventoryCheckingPaper', function(req, res){

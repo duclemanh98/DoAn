@@ -2,9 +2,9 @@
 
 DELIMITER &&
 DROP PROCEDURE IF EXISTS create_out_paper_with_date;
-CREATE PROCEDURE create_out_paper_with_date(IN buy VARCHAR(100), IN create_time TIMESTAMP, IN out_desc VARCHAR(100))
+CREATE PROCEDURE create_out_paper_with_date(IN buy VARCHAR(100), IN create_time TIMESTAMP, IN out_desc VARCHAR(100), IN createUser VARCHAR(50))
 BEGIN
-	INSERT INTO OutPaperTable(buyer, created_at, paper_desc) VALUES (buy, create_time, out_desc);
+	INSERT INTO OutPaperTable(buyer, created_at, paper_desc, create_user) VALUES (buy, create_time, out_desc, createUser);
 END &&
 DELIMITER ;
 #------------------------------------------
@@ -138,6 +138,7 @@ BEGIN
     DECLARE total_amount INT;
     DECLARE location INT;
     DECLARE check_status CHAR(1);
+    
     ###check if product has been completed before or not
     SELECT cur_status INTO check_status FROM SingleOutProductTable
     WHERE product_id = SingleOutProductTable.id AND out_paper = SingleOutProductTable.paper_id;
@@ -200,5 +201,24 @@ BEGIN
 	ELSE
 		SET check_val = 1;
 	END IF;
+END &&
+DELIMITER ;
+#------------------------------------
+### Update out paper user
+DELIMITER &&
+DROP PROCEDURE IF EXISTS confirmUserOutPaper;
+CREATE PROCEDURE confirmUserOutPaper(IN paper INT, IN confirmUser VARCHAR(50))
+BEGIN
+    DECLARE username VARCHAR(500);
+	DECLARE temp_name VARCHAR(500);
+    
+    SELECT confirm_user INTO username FROM OutPaperTable WHERE id = paper;
+    IF ISNULL(username) = 1 THEN
+		UPDATE OutPaperTable SET confirm_user = confirmUser WHERE id = paper;
+	ELSE
+		SELECT confirm_user INTO temp_name FROM OutPaperTable WHERE id = paper;
+        SET temp_name = CONCAT(temp_name, "\n", confirmUser);
+        UPDATE OutPaperTable SET confirm_user = temp_name WHERE id = paper;
+    END IF;
 END &&
 DELIMITER ;

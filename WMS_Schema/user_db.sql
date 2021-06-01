@@ -30,9 +30,9 @@ DELIMITER ;
 #---------------------------
 DELIMITER &&
 DROP PROCEDURE IF EXISTS delete_user;
-CREATE PROCEDURE delete_user(IN in_username VARCHAR(50), IN in_pass VARCHAR(50))
+CREATE PROCEDURE delete_user(IN in_username VARCHAR(50))
 BEGIN
-	DELETE FROM UserTable WHERE UserTable.username = in_username AND UserTable.pass = in_pass;
+	DELETE FROM UserTable WHERE UserTable.username = in_username;
 END &&
 DELIMITER ;
 #-----------

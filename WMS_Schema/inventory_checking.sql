@@ -5,7 +5,7 @@
 ### Tao phieu kiem ke
 DELIMITER &&
 DROP PROCEDURE IF EXISTS InventoryCheckingPaperCreate;
-CREATE PROCEDURE InventoryCheckingPaperCreate(IN buildingName CHAR(1), IN buildingFloor INT, IN buildingRoom INT, IN check_desc VARCHAR(100))
+CREATE PROCEDURE InventoryCheckingPaperCreate(IN buildingName CHAR(1), IN buildingFloor INT, IN buildingRoom INT, IN check_desc VARCHAR(100), IN createUser VARCHAR(50))
 BEGIN 
 	DECLARE first_pos INT;
     DECLARE last_pos INT;
@@ -17,7 +17,7 @@ BEGIN
     FROM LocationTable
     WHERE LocationTable.building = buildingName AND LocationTable.building_floor = buildingFloor AND LocationTable.room = buildingRoom;
     
-    INSERT INTO InventoryCheckingPaperTable(first_location, last_location, paper_desc) VALUES (first_pos, last_pos, check_desc);
+    INSERT INTO InventoryCheckingPaperTable(first_location, last_location, paper_desc, create_user) VALUES (first_pos, last_pos, check_desc, createUser);
 END &&
 DELIMITER ;
 
@@ -39,7 +39,8 @@ CREATE PROCEDURE DisplayAllInventoryPaper()
 BEGIN
 	SELECT InventoryCheckingPaperTable.id, InventoryCheckingPaperTable.created_at,
 		   LocationTable.building, LocationTable.building_floor, LocationTable.room,
-           InventoryCheckingPaperTable.cur_status, InventoryCheckingPaperTable.paper_desc
+           InventoryCheckingPaperTable.cur_status, InventoryCheckingPaperTable.paper_desc,
+           InventoryCheckingPaperTable.create_user
 	FROM InventoryCheckingPaperTable
     JOIN LocationTable ON LocationTable.id = InventoryCheckingPaperTable.first_location
     ORDER BY InventoryCheckingPaperTable.id ASC;
