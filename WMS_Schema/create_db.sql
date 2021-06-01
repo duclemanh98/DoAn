@@ -1,3 +1,35 @@
+Skip to content
+Why GitHub? 
+Team
+Enterprise
+Explore 
+Marketplace
+Pricing 
+Search
+
+Sign in
+Sign up
+duclemanh98
+/
+DoAn
+00
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+DoAn/WMS_Schema/create_db.sql
+@duclemanh98
+duclemanh98 update Backend. SQL: change database, change procedure: create_in_pap…
+…
+Latest commit 7a4d5ea 10 hours ago
+ History
+ 1 contributor
+223 lines (199 sloc)  6.84 KB
+  
 CREATE DATABASE wms_db;
 USE wms_db;
 #--------------------------------------
@@ -220,4 +252,3 @@ BEGIN
     ORDER BY id_barcode.id;
 END &&
 DELIMITER ;
-

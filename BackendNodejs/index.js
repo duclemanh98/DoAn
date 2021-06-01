@@ -170,11 +170,11 @@ app.post('/userDelete', async(req, res) => {
     try {
         pool.query('CALL delete_user(?)',[req.body.username], function(err){
             if(err) throw err;
-            return;
+            return res.json(true);
         });
     }
     catch(err) {
-        return;
+        return res.json(false);
     }
 })
 
@@ -420,6 +420,7 @@ app.post('/getDetailInPaper', function(req, res) {
  *
  * 
  *  @retval: object includes:
+ *  box_id              ---- ma san pham
  *  type_id:            ---- product type
  *  cur_name:           ---- name of product
  *  perbox:         ---- number of product / box
@@ -433,7 +434,7 @@ app.post('/getDetailInPaper', function(req, res) {
  */
 app.post('/addInScanProduct', function(req, res) {
     console.log("Add scanned product");
-    console.log(req.body);
+    // console.log(req.body);
     var product_id = parseInt(req.body.productID);
     if(req.body.productID==''||req.body.typeID==''||req.body.paperID=='') return;
     pool.query('CALL add_in_scanned_product(?,?,?)', [product_id, req.body.typeID, req.body.paperID], function(err){
@@ -492,25 +493,25 @@ app.post('/displayInScannedProduct', function(req, res){
  */
 
 function checkUserDuplicateInPaper(userName, paperID) {
-    return Promise(resolve => {
+    return new Promise(resolve => {
         pool.query('SELECT confirm_user FROM InPaperTable WHERE id = ?', [paperID], function(err, rows) {
             if(err) throw err;
+            // console.log(userName);
+            var objectReturn = '';
             var confirmName = rows[0].confirm_user.split("\n");
             for(var i = 0; i < confirmName.length; i++) {
-                if (userName = confirmName[i]) resolve(true);
+                if (userName == confirmName[i]) resolve(objectReturn);
             }
-            resolve(false);     ///=> no duplicate
+            resolve(userName);     ///=> no duplicate
         })
     })
 }
 
 app.post('/confirmInScanPaper', async(req, res) => {
+    // console.log(req.body)
     console.log("Confirm in paper "+req.body.paperID);
-    var confirmName;
-    if(await checkUserDuplicateInPaper(req.body.userName, req.body.paperID)) {
-        confirmName = '';
-    }
-    else confirmName = req.body.userName;
+    var confirmName = await checkUserDuplicateInPaper(req.body.userName, req.body.paperID);
+    // console.log(confirmName)
     pool.query('CALL complete_in_paper(?,?)', [req.body.paperID, confirmName], function(err){
         if(err) throw err;
         pool.query('SELECT cur_status FROM InPaperTable WHERE id = ?',[req.body.paperID], function(err, rows) {
@@ -741,14 +742,16 @@ app.post('/displayOutScannedProduct', function(req, res){
  */
 
 function checkUserDuplicateOutPaper(userName, paperID) {
-    return Promise(resolve => {
+    return new Promise(resolve => {
         pool.query('SELECT confirm_user FROM OutPaperTable WHERE id = ?', [paperID], function(err, rows) {
             if(err) throw err;
+            // console.log(userName);
+            var objectReturn = '';
             var confirmName = rows[0].confirm_user.split("\n");
             for(var i = 0; i < confirmName.length; i++) {
-                if (userName = confirmName[i]) resolve(true);
+                if (userName == confirmName[i]) resolve(objectReturn);
             }
-            resolve(false);     ///=> no duplicate
+            resolve(userName);     ///=> no duplicate
         })
     })
 }
@@ -756,11 +759,7 @@ function checkUserDuplicateOutPaper(userName, paperID) {
 app.post('/confirmOutScanProduct', async(req, res) => {
     console.log("Confirm out paper "+req.body.paperID);
     var prodFile = req.body.productInfo;
-    var confirmName;
-    if(await checkUserDuplicateOutPaper(req.body.userName, req.body.paperID)) {
-        confirmName = '';
-    }
-    else confirmName = req.body.userName;
+    var confirmName = await checkUserDuplicateOutPaper(req.body.userName, req.body.paperID);
 
     pool.query('CALL confirmUserOutPaper(?,?)', [req.body.paperID, confirmName], function(err, rows){
         if(err) throw err;
