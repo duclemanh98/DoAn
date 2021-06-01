@@ -69,3 +69,4 @@ DELIMITER ;
 SELECT * FROM UserTable;
 
 CALL updateUserRole('LeTao');
+SELECT CONCAT('as', '\n', '','\n','sad');

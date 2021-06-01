@@ -211,14 +211,15 @@ CREATE PROCEDURE confirmUserOutPaper(IN paper INT, IN confirmUser VARCHAR(50))
 BEGIN
     DECLARE username VARCHAR(500);
 	DECLARE temp_name VARCHAR(500);
-    
-    SELECT confirm_user INTO username FROM OutPaperTable WHERE id = paper;
-    IF ISNULL(username) = 1 THEN
-		UPDATE OutPaperTable SET confirm_user = confirmUser WHERE id = paper;
-	ELSE
-		SELECT confirm_user INTO temp_name FROM OutPaperTable WHERE id = paper;
-        SET temp_name = CONCAT(temp_name, "\n", confirmUser);
-        UPDATE OutPaperTable SET confirm_user = temp_name WHERE id = paper;
-    END IF;
+    IF confirmUser != '' THEN
+		SELECT confirm_user INTO username FROM OutPaperTable WHERE id = paper;
+		IF ISNULL(username) = 1 THEN
+			UPDATE OutPaperTable SET confirm_user = confirmUser WHERE id = paper;
+		ELSE
+			SELECT confirm_user INTO temp_name FROM OutPaperTable WHERE id = paper;
+			SET temp_name = CONCAT(temp_name, "\n", confirmUser);
+			UPDATE OutPaperTable SET confirm_user = temp_name WHERE id = paper;
+		END IF;
+	END IF;
 END &&
 DELIMITER ;
