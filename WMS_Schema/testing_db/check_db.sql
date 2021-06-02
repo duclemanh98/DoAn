@@ -6,7 +6,7 @@ SELECT * FROM TotalOutProductTable;
 SELECT * FROM SingleOutProductTable;
 SELECT * FROM UserTable;
 SELECT * FROM LocationTable;
-SELECT * FROM ProductTypeTable;
+SELECT * FROM ProductTypeTable WHERE id = 'RB110';
 UPDATE inpapertable SET cur_status = 'p' WHERE id = 2;
 SELECT * FROM LocationTable WHERE bin_status != 'free';
 
@@ -17,7 +17,7 @@ SELECT * FROM id_barcode;
 
 #-------------------------------
 ### use these command to clear value from LocationTable
-UPDATE LocationTable SET bin_status = 'free' WHERE bin_status != 'free';
+UPDATE LocationTable SET bin_status = 'occu' WHERE bin_status != 'free';
 
 CALL create_in_paper_wo_date('Kho A');
 CALL add_product_in_paper(2, 'Bích nối ống phun PPR DN 125 PN20', 2);
@@ -88,9 +88,18 @@ SELECT * FROM inventorycheckingpapertable;
 
 CALL UpdatePaperDescCheckingPaper(1,'test');
 
+DELETE FROM totaloutproducttable;
+DELETE FROM singleoutproductTable;
 
+CALL add_product_type_out_paper(1, 'RB110', 30);
 
+SELECT * FROM FactTable;
+SELECT * FROM TotalOutProductTable;
+SELECT * FROM SingleOutProductTable;
+SELECT * FROM OutPaperTable;
 
+CALL scan_out_product(1, 15, 1, 'RB110');
+CALL scan_out_product(1, 5, 1, 'RB110');
+CALL scan_out_product(4, 10, 1, 'RB110');
 
-
-
+CALL complete_out_paper(1);

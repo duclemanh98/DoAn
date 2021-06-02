@@ -4,6 +4,9 @@ DELIMITER &&
 DROP PROCEDURE IF EXISTS create_out_paper_with_date;
 CREATE PROCEDURE create_out_paper_with_date(IN buy VARCHAR(100), IN create_time TIMESTAMP, IN out_desc VARCHAR(100), IN createUser VARCHAR(50))
 BEGIN
+	IF ISNULL(out_desc) THEN
+		SET out_desc = '';
+	END IF;
 	INSERT INTO OutPaperTable(buyer, created_at, paper_desc, create_user) VALUES (buy, create_time, out_desc, createUser);
 END &&
 DELIMITER ;
@@ -41,7 +44,7 @@ DROP PROCEDURE IF EXISTS add_product_type_out_paper;
 CREATE PROCEDURE add_product_type_out_paper(IN paper INT, IN product_type VARCHAR(15), IN out_amount INT)
 BEGIN
 	###Variable storing temp amount of current product
-	DECLARE temp_amount INT;			#store amount of current product
+	DECLARE temp_amount INT;			#store amount of required current product
     DECLARE saved_amount INT;			#store amount of current selected product
     DECLARE saved_id INT DEFAULT 0;		#store id of current selected product
     DECLARE select_location INT;		#store location
@@ -52,20 +55,23 @@ BEGIN
     
     ###Update SingleOutProductTable
     SingleProdUpdate: LOOP
-		SELECT FactTable.id, FactTable.amount, FactTable.location_id INTO saved_id, saved_amount, select_location FROM FactTable
+		SELECT FactTable.id, FactTable.changed_amount, FactTable.location_id INTO saved_id, saved_amount, select_location FROM FactTable
         JOIN LocationTable ON FactTable.location_id = LocationTable.id
         WHERE product_type = FactTable.product_type_id AND FactTable.id > saved_id 
-        AND FactTable.amount > 0 AND LocationTable.bin_status = 'occu'
+        AND FactTable.changed_amount > 0 AND LocationTable.bin_status = 'occu'
         ORDER BY in_paper_id ASC LIMIT 1;
         
         ### Update Location Table to prevent users from taking another product from current location
-        UPDATE LocationTable SET bin_status = 'temp' WHERE LocationTable.id = select_location;
+        #UPDATE LocationTable SET bin_status = 'temp' WHERE LocationTable.id = select_location;
         
         IF temp_amount > saved_amount THEN
 			INSERT INTO SingleOutProductTable(id, amount, paper_id) VALUES (saved_id, saved_amount, paper);
             SET temp_amount = temp_amount - saved_amount;
+            UPDATE FactTable SET changed_amount = 0 WHERE FactTable.id = saved_id;
 		ELSE 
 			INSERT INTO SingleOutProductTable(id, amount, paper_id) VALUES (saved_id, temp_amount, paper);
+            SET saved_amount = saved_amount - temp_amount;
+            UPDATE FactTable SET changed_amount = saved_amount WHERE FactTable.id = saved_id;
             SET temp_amount = 0;
 		END IF;
        
@@ -221,5 +227,22 @@ BEGIN
 			UPDATE OutPaperTable SET confirm_user = temp_name WHERE id = paper;
 		END IF;
 	END IF;
+END &&
+DELIMITER ;
+
+
+####------------------------ 
+### Display product left for creating outPaper
+DELIMITER &&
+DROP PROCEDURE IF EXISTS show_product_left;
+CREATE PROCEDURE show_product_left()
+BEGIN 
+	SELECT ProductTypeTable.id AS type_id, ProductTypeTable.cur_name, SUM(FactTable.changed_amount) AS total_amount,
+		ProductTypeTable.max_amount AS perbox
+    FROM ProductTypeTable
+	LEFT JOIN FactTable
+		ON FactTable.product_type_id = ProductTypeTable.id
+	WHERE ISNULL(FactTable.amount) = 0 AND FactTable.changed_amount != 0
+    GROUP BY ProductTypeTable.id;
 END &&
 DELIMITER ;

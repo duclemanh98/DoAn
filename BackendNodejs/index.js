@@ -17,7 +17,8 @@ app.use(express.urlencoded( { extended: false}));
 var mysql = require('mysql');
 const pool = require('./pool');
 const { getConnection, query } = require('./pool');
-const { SSL_OP_EPHEMERAL_RSA } = require('constants');
+const { SSL_OP_EPHEMERAL_RSA, EEXIST } = require('constants');
+const { createCipher } = require('crypto');
 
 
 /*
@@ -420,7 +421,11 @@ app.post('/getDetailInPaper', function(req, res) {
  *
  * 
  *  @retval: object includes:
+
+ *  box_id:             ----product id
+=======
  *  box_id              ---- ma san pham
+
  *  type_id:            ---- product type
  *  cur_name:           ---- name of product
  *  perbox:         ---- number of product / box
@@ -435,22 +440,31 @@ app.post('/getDetailInPaper', function(req, res) {
 app.post('/addInScanProduct', function(req, res) {
     console.log("Add scanned product");
     // console.log(req.body);
-    var product_id = parseInt(req.body.productID);
-    if(req.body.productID==''||req.body.typeID==''||req.body.paperID=='') return;
-    pool.query('CALL add_in_scanned_product(?,?,?)', [product_id, req.body.typeID, req.body.paperID], function(err){
-        if(err) {
-            console.log("Error in current input product");
-            return;
-        }
-        pool.query('CALL assign_location_in_product(?)', [product_id], function(err){
-            if(err) throw err;
-            pool.query('CALL search_with_product_id(?)', [product_id], function(err, rows){
+    try {
+        var product_id = parseInt(req.body.productID);
+        if(req.body.productID==''||req.body.typeID==''||req.body.paperID=='') return;
+        pool.query('CALL add_in_scanned_product(?,?,?)', [product_id, req.body.typeID, req.body.paperID], function(err){
+            if(err) {
+                console.log("Error in current input product");
+                throw err;
+            }
+            pool.query('CALL assign_location_in_product(?)', [product_id], function(err){
                 if(err) throw err;
-                console.log(rows[0]);
-                res.send(JSON.parse(JSON.stringify(rows[0])));
+                pool.query('CALL search_with_product_id(?)', [product_id], function(err, rows){
+                    if(err) throw err;
+                    rows[0]["status"] = true;
+                    console.log(rows[0]);
+                    res.send(JSON.parse(JSON.stringify(rows[0])));
+                })
             })
         })
-    })
+    }
+    catch(err) {
+        console.log("Error when adding to database");
+        var objectReturn = {status: false};
+        res.send(objectReturn);
+    }
+    
 })
 
 /*
@@ -476,7 +490,7 @@ app.post('/displayInScannedProduct', function(req, res){
     //console.log(req.body);
     console.log("Display scanned products of paper "+req.body.paperID);
     pool.query('CALL search_scanned_product(?)', [req.body.paperID], function(err, rows){
-        if(err) return;
+        if(err) throw err;
         res.send(JSON.parse(JSON.stringify(rows[0])));
     })
 })
@@ -496,13 +510,12 @@ function checkUserDuplicateInPaper(userName, paperID) {
     return new Promise(resolve => {
         pool.query('SELECT confirm_user FROM InPaperTable WHERE id = ?', [paperID], function(err, rows) {
             if(err) throw err;
-            // console.log(userName);
             var objectReturn = '';
             var confirmName = rows[0].confirm_user.split("\n");
             for(var i = 0; i < confirmName.length; i++) {
-                if (userName == confirmName[i]) resolve(objectReturn);
+                if(userName == confirmName[i]) resolve(objectReturn);
             }
-            resolve(userName);     ///=> no duplicate
+            resolve(userName);
         })
     })
 }
@@ -510,8 +523,12 @@ function checkUserDuplicateInPaper(userName, paperID) {
 app.post('/confirmInScanPaper', async(req, res) => {
     // console.log(req.body)
     console.log("Confirm in paper "+req.body.paperID);
+
+    var confirmName = await checkUserDuplicateInPaper(req.body.userName, req.body.paperID);
+    
     var confirmName = await checkUserDuplicateInPaper(req.body.userName, req.body.paperID);
     // console.log(confirmName)
+
     pool.query('CALL complete_in_paper(?,?)', [req.body.paperID, confirmName], function(err){
         if(err) throw err;
         pool.query('SELECT cur_status FROM InPaperTable WHERE id = ?',[req.body.paperID], function(err, rows) {
@@ -538,7 +555,7 @@ app.post('/confirmInScanPaper', async(req, res) => {
  */
 app.post('/displayProductLeft', function(req, res) {
     console.log("Get product type and number left in warehouse");
-    pool.query('CALL show_total_product_warehouse(?)', [''], function(err, rows) {
+    pool.query('CALL show_product_left()', function(err, rows) {
         if(err) throw err;
         res.send(JSON.parse(JSON.stringify(rows[0])));
     })
@@ -565,10 +582,11 @@ app.post('/createOutPaper', function(req, res){
     else dateObject = new Date;
     
     console.log(req.body);
-    pool.query("CALL create_out_paper_with_date(?,?,?,?)", [req.body.buyer, dateObject, req.body.paperDesc, req.body.userName], function(err){
-        if(err) return res.json(0);
+    pool.query("CALL create_out_paper_with_date(?,?,?,?)", [req.body.buyer, dateObject, req.body.description, req.body.userName], function(err){
+        if(err) throw err;
         pool.query("SELECT MAX(id) AS paper_id FROM OutPaperTable", function(err, rows) {
             if(err) throw err;
+            console.log(rows[0]);
             return res.json(rows[0].paper_id);
         })
     })
@@ -582,20 +600,30 @@ app.post('/createOutPaper', function(req, res){
  *  + product_info: {type_id, cur_name, amount}
  *  @retval: true or false
  */
+function addPerProductTypeOutPaper(perProdFile, paperID) {
+    return new Promise(resolve => {
+        pool.query('CALL add_product_type_out_paper(?,?,?)', [paperID, perProdFile.productID, perProdFile.productQuantity], function(err, rows){
+            if(err) throw err;
+            resolve(true);
+        })
+    })
+}
+
+function processAddProductTypeOutPaper(productFile, paperID) {
+    return new Promise(async(resolve) => {
+        for(const item of productFile) {
+            await addPerProductTypeOutPaper(item, paperID);
+        }
+        resolve(true);
+    })
+}
+
 app.post('/addOutProduct', async(req, res) => {
     console.log("Add out product");
     console.log(req.body.paper_id);
-    var prodFile = JSON.parse(JSON.stringify(req.body.product_info));
-    //console.log(product_file);
-    console.log(prodFile);
+    // var productFile = req.body.product_info;
+    await processAddProductTypeOutPaper(req.body.product_info, req.body.paper_id);
     
-    var length = Object.keys(req.body.product_info).length;
-
-    for(var i=0;i<length;i++) {
-        pool.query('CALL add_product_type_out_paper(?,?,?)',[req.body.paper_id, prodFile[i].productID, prodFile[i].productQuantity], function(err, results){
-            if(err) return res.json(false);
-        })
-    }
     return res.json(true);
 })
 
@@ -745,13 +773,12 @@ function checkUserDuplicateOutPaper(userName, paperID) {
     return new Promise(resolve => {
         pool.query('SELECT confirm_user FROM OutPaperTable WHERE id = ?', [paperID], function(err, rows) {
             if(err) throw err;
-            // console.log(userName);
             var objectReturn = '';
             var confirmName = rows[0].confirm_user.split("\n");
             for(var i = 0; i < confirmName.length; i++) {
-                if (userName == confirmName[i]) resolve(objectReturn);
+                if(userName == confirmName[i]) resolve(objectReturn);
             }
-            resolve(userName);     ///=> no duplicate
+            resolve(useerName);
         })
     })
 }

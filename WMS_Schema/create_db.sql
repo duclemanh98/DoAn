@@ -1,34 +1,4 @@
-Skip to content
-Why GitHub? 
-Team
-Enterprise
-Explore 
-Marketplace
-Pricing 
-Search
 
-Sign in
-Sign up
-duclemanh98
-/
-DoAn
-00
-Code
-Issues
-Pull requests
-Actions
-Projects
-Wiki
-Security
-Insights
-DoAn/WMS_Schema/create_db.sql
-@duclemanh98
-duclemanh98 update Backend. SQL: change database, change procedure: create_in_pap…
-…
-Latest commit 7a4d5ea 10 hours ago
- History
- 1 contributor
-223 lines (199 sloc)  6.84 KB
   
 CREATE DATABASE wms_db;
 USE wms_db;
@@ -124,6 +94,7 @@ CREATE TABLE FactTable(
 	id INT PRIMARY KEY,
     in_paper_id INT NOT NULL,
     amount INT NOT NULL,
+    changed_amount INT NOT NULL,
     location_id INT DEFAULT NULL,
     product_type_id VARCHAR(15) NOT NULL,
     old_location INT DEFAULT NULL,
@@ -132,6 +103,7 @@ CREATE TABLE FactTable(
     FOREIGN KEY (product_type_id) REFERENCES ProductTypeTable(id),
     FOREIGN KEY (old_location) REFERENCES LocationTable(id)
 );
+
 #DROP TABLE SingleOutProductTable;
 CREATE TABLE SingleOutProductTable (
 	id INT NOT NULL,

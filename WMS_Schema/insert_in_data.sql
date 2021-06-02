@@ -139,7 +139,7 @@ BEGIN
 	# Create in fact table
     DECLARE temp_amount INT;
     SELECT max_amount INTO temp_amount FROM ProductTypeTable WHERE ProductTypeTable.id = product_type;
-    INSERT INTO FactTable(id, in_paper_id, amount, product_type_id) VALUES (product_id, in_paper, temp_amount, product_type);
+    INSERT INTO FactTable(id, in_paper_id, amount, changed_amount,product_type_id) VALUES (product_id, in_paper, temp_amount, temp_amount, product_type);
 	# Update InProductTable
     SELECT scan_number INTO temp_amount FROM InProductTable
     WHERE in_paper = InProductTable.paper_id AND product_type = InProductTable.id;
