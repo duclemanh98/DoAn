@@ -244,7 +244,7 @@ CREATE PROCEDURE search_inout_product(IN first_date DATETIME, IN last_date DATET
 BEGIN
 	DROP TEMPORARY TABLE IF EXISTS TempInProd;
     CREATE TEMPORARY TABLE TempInProd AS (
-		SELECT InProductTable.id, SUM(InProductTable.box_amount) AS in_amount 
+		SELECT InProductTable.id, SUM(InProductTable.scan_number) AS in_amount 
         FROM InProductTable
         JOIN InPaperTable ON InProductTable.paper_id = InPaperTable.id
         WHERE InPaperTable.created_at BETWEEN first_date AND last_date
@@ -253,7 +253,7 @@ BEGIN
     
     DROP TEMPORARY TABLE IF EXISTS TempOutProd;
     CREATE TEMPORARY TABLE TempOutProd AS (
-		SELECT TotalOutProductTable.id, SUM(TotalOutProductTable.amount) AS out_amount 
+		SELECT TotalOutProductTable.id, SUM(TotalOutProductTable.selected_amount) AS out_amount 
         FROM TotalOutProductTable
         JOIN OutPaperTable ON TotalOutProductTable.paper_id = OutPaperTable.id
         WHERE OutPaperTable.created_at BETWEEN first_date AND last_date
@@ -346,3 +346,140 @@ BEGIN
     JOIN temp_table ON temp_table.paper_id = OutPaperTable.id;
 END &&
 DELIMITER ;
+
+###--------------------------------
+## Search all information about current product from name and type id
+DELIMITER &&
+DROP PROCEDURE IF EXISTS searchAllInfoProductFromName;
+CREATE PROCEDURE searchAllInfoProductFromName(IN prodName VARCHAR(100), IN typeID VARCHAR(15))
+BEGIN
+	DROP TEMPORARY TABLE IF EXISTS outInfoProd;
+	CREATE TEMPORARY TABLE IF NOT EXISTS outInfoProd AS (
+		SELECT singleoutproducttable.id, 
+			CONCAT(DATE(outpapertable.created_at), " - SL: ",singleoutproducttable.selected_amount, " - Phiếu: ",singleoutproducttable.paper_id) 
+			AS out_info
+		FROM OutPaperTable
+		JOIN SingleOutProductTable ON OutPaperTable.id = SingleOutProductTable.paper_id
+		#GROUP BY SingleOutProductTable.id
+		ORDER BY SingleOutProductTable.id, SingleOutProductTable.paper_id
+    );
+    
+    SELECT FactTable.id AS box_id, FactTable.product_type_id AS type_id, 
+		ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox,
+		FactTable.in_paper_id, InPaperTable.created_at AS in_date,
+        outInfoProd.out_info, FactTable.amount,
+        CONCAT_WS("-", FactTable.location_id, building, building_floor, room, rack, rack_bin) AS location
+    FROM FactTable
+    LEFT JOIN InPaperTable ON InPaperTable.id = FactTable.in_paper_id
+    LEFT JOIN ProductTypeTable ON ProductTypeTable.id = FactTable.product_type_id
+    LEFT JOIN outInfoProd ON outInfoProd.id = FactTable.id
+    LEFT JOIN LocationTable ON LocationTable.id = FactTable.location_id
+    WHERE ISNULL(FactTable.location_id) = 0 
+		AND ProductTypeTable.cur_name LIKE CONCAT("%", prodName, "%")
+        AND ProductTypeTable.id LIKE CONCAT("%", typeID, "%")
+	ORDER BY FactTable.id;
+END &&
+DELIMITER ;
+
+###--------------------------------
+## Search all information about current product from full location
+DELIMITER &&
+DROP PROCEDURE IF EXISTS searchAllInfoProductFromLocation;
+CREATE PROCEDURE searchAllInfoProductFromLocation(IN buildingName CHAR(1), IN buildingFloor INT, IN buildingRoom INT)
+BEGIN
+	DROP TEMPORARY TABLE IF EXISTS outInfoProd;
+	CREATE TEMPORARY TABLE IF NOT EXISTS outInfoProd AS (
+		SELECT singleoutproducttable.id, 
+			CONCAT(DATE(outpapertable.created_at), " - SL: ",singleoutproducttable.selected_amount, " - Phiếu: ",singleoutproducttable.paper_id)  
+			AS out_info
+		FROM OutPaperTable
+		JOIN SingleOutProductTable ON OutPaperTable.id = SingleOutProductTable.paper_id
+		#GROUP BY SingleOutProductTable.id
+		ORDER BY SingleOutProductTable.id, SingleOutProductTable.paper_id
+    );
+    
+    SELECT FactTable.id AS box_id, FactTable.product_type_id AS type_id, 
+		ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox,
+		FactTable.in_paper_id, InPaperTable.created_at AS in_date,
+        outInfoProd.out_info, FactTable.amount,
+        CONCAT_WS("-", FactTable.location_id, building, building_floor, room, rack, rack_bin) AS location
+    FROM FactTable
+    LEFT JOIN InPaperTable ON InPaperTable.id = FactTable.in_paper_id
+    LEFT JOIN ProductTypeTable ON ProductTypeTable.id = FactTable.product_type_id
+    LEFT JOIN outInfoProd ON outInfoProd.id = FactTable.id
+    LEFT JOIN LocationTable ON LocationTable.id = FactTable.location_id
+    WHERE ISNULL(FactTable.location_id) = 0 
+		AND LocationTable.building = buildingName
+        AND LocationTable.building_floor = buildingFloor
+        AND LocationTable.room = buildingRoom
+	ORDER BY LocationTable.id ASC;
+END &&
+DELIMITER ;
+
+###--------------------------------
+## Search all information about current product from full location
+DELIMITER &&
+DROP PROCEDURE IF EXISTS searchAllInfoProductFromAllLocation;
+CREATE PROCEDURE searchAllInfoProductFromAllLocation()
+BEGIN
+	DROP TEMPORARY TABLE IF EXISTS outInfoProd;
+	CREATE TEMPORARY TABLE IF NOT EXISTS outInfoProd AS (
+		SELECT singleoutproducttable.id, 
+			CONCAT(DATE(outpapertable.created_at), " - SL: ",singleoutproducttable.selected_amount, " - Phiếu: ",singleoutproducttable.paper_id)  
+			AS out_info
+		FROM OutPaperTable
+		JOIN SingleOutProductTable ON OutPaperTable.id = SingleOutProductTable.paper_id
+		#GROUP BY SingleOutProductTable.id
+		ORDER BY SingleOutProductTable.id, SingleOutProductTable.paper_id
+    );
+    
+    SELECT FactTable.id AS box_id, FactTable.product_type_id AS type_id, 
+		ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox,
+		FactTable.in_paper_id, InPaperTable.created_at AS in_date,
+        outInfoProd.out_info, FactTable.amount,
+        CONCAT_WS("-", FactTable.location_id, building, building_floor, room, rack, rack_bin) AS location
+    FROM FactTable
+    LEFT JOIN InPaperTable ON InPaperTable.id = FactTable.in_paper_id
+    LEFT JOIN ProductTypeTable ON ProductTypeTable.id = FactTable.product_type_id
+    LEFT JOIN outInfoProd ON outInfoProd.id = FactTable.id
+    LEFT JOIN LocationTable ON LocationTable.id = FactTable.location_id
+    WHERE ISNULL(FactTable.location_id) = 0 
+	ORDER BY LocationTable.id ASC;
+END &&
+DELIMITER ;
+
+###--------------------------------
+## Search all information about current product from name and type id
+DELIMITER &&
+DROP PROCEDURE IF EXISTS searchAllInfoProductFromID;
+CREATE PROCEDURE searchAllInfoProductFromID(IN prodName VARCHAR(100), IN typeID VARCHAR(15), IN boxID INT)
+BEGIN
+	DROP TEMPORARY TABLE IF EXISTS outInfoProd;
+	CREATE TEMPORARY TABLE IF NOT EXISTS outInfoProd AS (
+		SELECT singleoutproducttable.id, 
+			CONCAT(DATE(outpapertable.created_at), " - SL: ",singleoutproducttable.selected_amount, " - Phiếu: ",singleoutproducttable.paper_id) 
+			AS out_info
+		FROM OutPaperTable
+		JOIN SingleOutProductTable ON OutPaperTable.id = SingleOutProductTable.paper_id
+		#GROUP BY SingleOutProductTable.id
+		ORDER BY SingleOutProductTable.id, SingleOutProductTable.paper_id
+    );
+    
+    SELECT FactTable.id AS box_id, FactTable.product_type_id AS type_id, 
+		ProductTypeTable.cur_name, ProductTypeTable.max_amount AS perbox,
+		FactTable.in_paper_id, InPaperTable.created_at AS in_date,
+        outInfoProd.out_info, FactTable.amount,
+        CONCAT_WS("-", FactTable.location_id, building, building_floor, room, rack, rack_bin) AS location
+    FROM FactTable
+    LEFT JOIN InPaperTable ON InPaperTable.id = FactTable.in_paper_id
+    LEFT JOIN ProductTypeTable ON ProductTypeTable.id = FactTable.product_type_id
+    LEFT JOIN outInfoProd ON outInfoProd.id = FactTable.id
+    LEFT JOIN LocationTable ON LocationTable.id = FactTable.location_id
+    WHERE ISNULL(FactTable.location_id) = 0 
+		AND ProductTypeTable.cur_name LIKE CONCAT("%", prodName, "%")
+        AND ProductTypeTable.id LIKE CONCAT("%", typeID, "%")
+        AND FactTable.id = boxID
+	ORDER BY FactTable.id;
+END &&
+DELIMITER ;
+

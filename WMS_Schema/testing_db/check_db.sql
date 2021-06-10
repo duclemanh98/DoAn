@@ -6,8 +6,7 @@ SELECT * FROM TotalOutProductTable;
 SELECT * FROM SingleOutProductTable;
 SELECT * FROM UserTable;
 SELECT * FROM LocationTable;
-SELECT * FROM ProductTypeTable WHERE id = 'RB110';
-UPDATE inpapertable SET cur_status = 'p' WHERE id = 2;
+SELECT * FROM ProductTypeTable;
 SELECT * FROM LocationTable WHERE bin_status != 'free';
 
 SELECT * FROM id_barcode;
@@ -94,8 +93,8 @@ DELETE FROM singleoutproductTable;
 CALL add_product_type_out_paper(1, 'RB110', 30);
 
 SELECT * FROM FactTable;
-SELECT * FROM TotalOutProductTable;
-SELECT * FROM SingleOutProductTable;
+SELECT * FROM TotalOutProductTable ORDER BY paper_id;
+SELECT * FROM SingleOutProductTable ORDER BY paper_id;
 SELECT * FROM OutPaperTable;
 
 CALL scan_out_product(1, 15, 1, 'RB110');
@@ -103,3 +102,11 @@ CALL scan_out_product(1, 5, 1, 'RB110');
 CALL scan_out_product(4, 10, 1, 'RB110');
 
 CALL complete_out_paper(1);
+
+CALL searchAllInfoProductFromName('','');
+
+CALL searchAllInfoProductFromLocation('I', 1, 1);
+
+CALL searchAllInfoProductFromID('', 'RDB20', 7);
+
+CALL searchAllInfoProductFromAllLocation();

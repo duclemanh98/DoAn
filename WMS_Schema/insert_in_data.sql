@@ -56,7 +56,7 @@ BEGIN
     
     IF confirmUSer != '' THEN
 		SELECT confirm_user INTO username FROM InPaperTable WHERE id = paper;
-		IF ISNULL(username) = 1 THEN
+		IF ISNULL(username) = 1 OR username = '' THEN
 			UPDATE InPaperTable SET confirm_user = confirmUser WHERE id = paper;
 		ELSE
 			SELECT confirm_user INTO temp_name FROM InPaperTable WHERE id = paper;

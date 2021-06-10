@@ -110,16 +110,17 @@ BEGIN
     DECLARE finish_check CHAR(1);
     
     SELECT cur_status INTO finish_check FROM InventoryCheckingPaperTable WHERE id = paperID;
-    
-    IF finish_check != 'c' THEN
-		SELECT paper_desc INTO newDesc FROM InventoryCheckingPaperTable WHERE id = paperID;
-        IF ISNULL(newDesc) = 1 THEN
-			SET newDesc = paperDesc;
-		ELSE
-			SET newDesc = CONCAT(newDesc, "\n", paperDesc);
-		END IF;
+    IF paperDesc != '' OR ISNULL(paperDesc) = 0 THEN
+		IF finish_check != 'c' THEN
+			SELECT paper_desc INTO newDesc FROM InventoryCheckingPaperTable WHERE id = paperID;
+			IF ISNULL(newDesc) = 1 OR newDesc = '' THEN
+				SET newDesc = paperDesc;
+			ELSE
+				SET newDesc = CONCAT(newDesc, "\n", paperDesc);
+			END IF;
         
-        UPDATE InventoryCheckingPaperTable SET paper_desc = newDesc WHERE id = paperID;
+			UPDATE InventoryCheckingPaperTable SET paper_desc = newDesc WHERE id = paperID;
+		END IF;
     END IF;
 END &&
 DELIMITER ;
@@ -205,6 +206,7 @@ BEGIN
     JOIN InventoryCheckingProductTable ON FactTable.id = InventoryCheckingProductTable.id
     JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
     WHERE InventoryCheckingProductTable.paper_id = paperID AND product_dir = 'i'
+		AND mis_amount != 0
 	ORDER BY LocationTable.id ASC;
 END &&
 DELIMITER ;
@@ -225,6 +227,7 @@ BEGIN
     JOIN InventoryCheckingProductTable ON FactTable.id = InventoryCheckingProductTable.id
     JOIN ProductTypeTable ON FactTable.product_type_id = ProductTypeTable.id
     WHERE InventoryCheckingProductTable.paper_id = paperID AND product_dir = 'o'
+		AND mis_amount != 0
 	ORDER BY LocationTable.id ASC;
 END &&
 DELIMITER ;

@@ -1,4 +1,3 @@
-
 var express = require('express');
 var app = express();
 
@@ -298,8 +297,9 @@ app.post('/addInProduct', async(req, res) => {
 
 app.post('/addProductType', function(req, res){
     console.log("Add Product with id: "+req.body.typeID);
-    pool.query('CALL add_product_type(?,?,?)', [req.body.typeID, req.body.productName, req.body.perbox], function(err, rows){
-        if(err) return res.json(false);
+    console.log(req.body);
+    pool.query('CALL add_product_type(?,?,?)', [req.body.typeID, req.body.ProductName, req.body.perbox], function(err, rows){
+        if(err) throw err;
         return res.json(true);
     })
 })
@@ -446,7 +446,9 @@ app.post('/addInScanProduct', function(req, res) {
         pool.query('CALL add_in_scanned_product(?,?,?)', [product_id, req.body.typeID, req.body.paperID], function(err){
             if(err) {
                 console.log("Error in current input product");
-                throw err;
+                var objectReturn = {status: false};
+                res.send(objectReturn);
+                return;
             }
             pool.query('CALL assign_location_in_product(?)', [product_id], function(err){
                 if(err) throw err;
@@ -524,8 +526,6 @@ app.post('/confirmInScanPaper', async(req, res) => {
     // console.log(req.body)
     console.log("Confirm in paper "+req.body.paperID);
 
-    var confirmName = await checkUserDuplicateInPaper(req.body.userName, req.body.paperID);
-    
     var confirmName = await checkUserDuplicateInPaper(req.body.userName, req.body.paperID);
     // console.log(confirmName)
 
@@ -649,7 +649,7 @@ app.post('/displayAllOutPaper', function(req, res){
     pool.query('SELECT * FROM OutPaperTable', function(err, rows){
         if(err) throw err;
         for(var i = 0; i < rows.length; i++){
-            console.log(rows[i].created_at);
+            // console.log(rows[i].created_at);
             rows[i].created_at = rows[i].created_at.split(' ')[0];
         }
         res.send(JSON.parse(JSON.stringify(rows)));
@@ -778,25 +778,53 @@ function checkUserDuplicateOutPaper(userName, paperID) {
             for(var i = 0; i < confirmName.length; i++) {
                 if(userName == confirmName[i]) resolve(objectReturn);
             }
-            resolve(useerName);
+            resolve(userName);
         })
+    })
+}
+
+function updateConfirmUser(confirmUser, paperID) {
+    return new Promise(resolve => {
+        pool.query('CALL confirmUserOutPaper(?,?)', [paperID, confirmUser], function(err, rows){
+            if(err) throw err;
+            resolve(true);
+        });
+    })
+}
+
+function addScanProduct(perProductFile, paperID) {
+    return new Promise(resolve => {
+        pool.query('CALL scan_out_product(?,?,?,?)', [perProductFile.boxID, perProductFile.amount, paperID, perProductFile.typeID], function(err) {
+            if(err) throw err;
+            resolve(true)
+        }) 
+    })
+}
+
+function processAddScanProduct(productFile, paperID) {
+    return new Promise(async(resolve) => {
+        for(const item of productFile) {
+            await addScanProduct(item, paperID);
+        }
+        resolve(true);
     })
 }
 
 app.post('/confirmOutScanProduct', async(req, res) => {
     console.log("Confirm out paper "+req.body.paperID);
+    console.log(req.body);
     var prodFile = req.body.productInfo;
+    console.log(prodFile);
     var confirmName = await checkUserDuplicateOutPaper(req.body.userName, req.body.paperID);
+    console.log(confirmName);
 
-    pool.query('CALL confirmUserOutPaper(?,?)', [req.body.paperID, confirmName], function(err, rows){
+    await updateConfirmUser(confirmName, req.body.paperID);
+
+    await processAddScanProduct(prodFile, req.body.paperID);
+
+    pool.query('CALL complete_out_paper(?)', [req.body.paperID], function(err, rows){
         if(err) throw err;
-    });
-
-    for(var i = 0; i < req.body.productInfo.length; i++) {
-        pool.query('CALL scan_out_product(?,?,?)', [prodFile[i].productID, prodFile[i].amount, req.body.paperID, prodFile[i].typeID], function(err) {
-            if(err) throw err;
-        }) 
-    }
+    })
 })
 
 
@@ -979,7 +1007,7 @@ function addPerProductToInventory(perProductFile, paperID) {
 
 app.post('/createInventoryCheckingPaper', async(req, res) => {
     console.log('Create Inventory Checking Paper');
-    //console.log(req.body);
+    console.log(req.body);
     var paperID = await createInventoryChecking(req);
     var productFile = await selectProductInLocation(req);
     
@@ -1086,14 +1114,13 @@ app.post('/updateInSystemAmount', async(req, res) => {
         if(err) throw err;
         pool.query('CALL CheckBlankIOChecking(?)', [req.body.paperID], function(err, rows){
             if(err) throw err;
-            if(req.body.paperDesc != '') {
-                pool.query('CALL UpdatePaperDescCheckingPaper(?,?)', [req.body.paperID,  req.body.paperDesc], function(err, rows){
-                    if(err) throw err;
-                    pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
-                        if(err) throw err;
-                    })
+            pool.query('CALL UpdatePaperDescCheckingPaper(?,?)', [req.body.paperID,  req.body.paperDesc], function(err, rows){
+                if(err) throw err;
+                pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
+                    if(err) throw err;   
+                    res.send(true);
                 })
-            }  
+            })
         })   
     })
 })
@@ -1120,14 +1147,13 @@ app.post('/updateOutSystemAmount', async(req, res) => {
         if(err) throw err;
         pool.query('CALL CheckBlankIOChecking(?)', [req.body.paperID], function(err, rows){
             if(err) throw err;
-            if(req.body.paperDesc != '') {
-                pool.query('CALL UpdatePaperDescCheckingPaper(?,?)', [req.body.paperID,  req.body.paperDesc], function(err, rows){
-                    if(err) throw err;
-                    pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
-                        if(err) throw err;
-                    })
+            pool.query('CALL UpdatePaperDescCheckingPaper(?,?)', [req.body.paperID,  req.body.paperDesc], function(err, rows){
+                if(err) throw err;
+                pool.query('CALL ConfirmMismatchCheckingPaper(?)', [req.body.paperID], function(err, rows){
+                    if(err) throw err;   
+                    res.send(true);
                 })
-            }  
+            })
         })   
     })
 })
@@ -1136,12 +1162,13 @@ app.post('/updateOutSystemAmount', async(req, res) => {
 function UpdateInventoryProduct(perProductFile, paperID){
     return new Promise(resolve => {
         if(perProductFile.cur_status == 'h') {
+            // console.log("in here")
             pool.query('CALL UpdateIOInventoryChecking(?,?,?,?)', [perProductFile.productID, paperID, perProductFile.sys_amount, perProductFile.real_amount], function(err){
                 if(err) resolve(false);
                 resolve(true);
             })
         }
-        //resolve(true);
+        else resolve(true);
     })
 }
 
@@ -1170,6 +1197,7 @@ function processUpdateInventory(productFile, paperID) {
  */
 
 app.post('/confirmInventoryCheckingPaper', async(req, res) => {
+    console.log(req.body)
     console.log('Confirm Inventory Checking Paper '+req.body.paperID);
     var productFile = req.body.productInfo;
     var waitingValue = false;
@@ -1177,6 +1205,7 @@ app.post('/confirmInventoryCheckingPaper', async(req, res) => {
     
     pool.query('CALL ConfirmInventoryCheckingPaper(?)', [req.body.paperID], function(err){
         if(err) throw err;
+        // console.log("confirmed")
     }) 
 })
 
@@ -1259,6 +1288,147 @@ app.post('/displayBarcodePaper', function(req, res) {
 })
 
 
+
+/******************************************************************/
+/************** Search info of product ****************************/
+function createProductInfoList(productList) {
+    var productFile = new Array();
+    var productIndex = 0;
+    var productID = 0;
+    for(var i = 0; i < productList.length; i++) {
+      if(productID != productList[i].box_id) {
+        productFile.push(productList[i]);
+        productID = productList[i].box_id;
+        productFile[productIndex].in_date = productFile[productIndex].in_date.split(" ")[0];
+        productIndex++;
+        // console.log(rows[0][i])
+      }
+      else {
+        // console.log(productFile[productIndex-1]);
+        productFile[productIndex-1].out_info += "\n" + productList[i].out_info;
+      }
+    }
+    return productFile;    
+}
+
+
+/*
+ *  /getInfoFromName
+ *  @brief: Get all information about one type of product inside warehoue
+ *  req:
+ *  productName:    name of product
+ *  boxID:         ID of product: contain box_id and type_id, example: 01-RB110
+ *  
+ *  @note: if no product is chosen, productName and typeID should be ''
+ * 
+ *  @retval:
+ *  box_id:                 --- ID of box
+ *  type_id:                --- ID of product type
+ *  cur_name:               --- name of product
+ *  in_paper_id:            --- ID of import paper
+ *  in_date:                --- import date
+ *  out_info:               --- info of export: export paper : export date : export amount (different export event divided by \n)
+ *  amount:                 --- current amount in warehouse
+ *  location:               --- location indication: location id - building - floor - room - rack - bin slot
+ *  
+ *  @noteL out_info and location: please display directly to table without further change
+ */ 
+
+app.post('/getInfoFromName', function(req, res){
+    console.log("Get info from name");
+    console.log(req.body);
+    var product_name;
+    if(!req.body.productName) {
+        product_name = '';
+    }
+    else product_name = req.body.productName;
+
+    if(req.body.boxID == '') {
+        pool.query('CALL searchAllInfoProductFromName(?,?)', [product_name, req.body.boxID], function(err, rows) {
+            if(err) throw err;
+            // console.log(rows[0]);
+            var productFile = createProductInfoList(rows[0]);
+            res.send(productFile);
+        })
+    }
+    else {
+        try {
+            var productID = req.body.boxID.split("-")[0];
+            var productType = req.body.boxID.split("-")[1];
+            pool.query('CALL searchAllInfoProductFromID(?,?,?)', [product_name, productType, productID], function(err, rows){
+                if(err) throw err;
+                var productFile = createProductInfoList(rows[0]);
+                res.send(productFile);
+            })
+        }
+        catch(err) {
+            pool.query('CALL searchAllInfoProductFromName', ['', ''], function(err, rows) {
+                if(err)  throw err;
+                var productFile = createProductInfoList(rows[0]);
+                res.send(productFile);
+            })
+        }
+    }
+})
+
+
+/*
+ *  /getInfoFromLocation
+ *  @brief: Get all information about one type of product inside warehoue
+ *  req:
+ *  buildingName
+ *  buildingFloor
+ *  buildingRoom
+ *  
+ *  @note: if no product is chosen, productName and typeID should be ''
+ * 
+ *  @retval:
+ *  box_id:                 --- ID of box
+ *  type_id:                --- ID of product type
+ *  cur_name:               --- name of product
+ *  in_paper_id:            --- ID of import paper
+ *  in_date:                --- import date
+ *  out_info:               --- info of export: export paper : export date : export amount (different export event divided by \n)
+ *  amount:                 --- current amount in warehouse
+ *  location:               --- location indication: location id - building - floor - room - rack - bin slot
+ *  
+ *  @noteL out_info and location: please display directly to table without further change
+ */ 
+
+app.post('/getInfoFromLocation', function(req, res){
+    console.log("Get product from Location");
+    console.log(req.body);
+    if(!req.body.buildingName) {
+        req.body.buildingName = '';
+    }
+
+    if(!req.body.buildingFloor) {
+        req.body.buildingFloor = '';
+    }
+    
+    if(!req.body.buildingRoom) {
+        req.body.buildingRoom = '';
+    }
+    
+    if(req.body.buildingName != '' && req.body.buildingFloor != '' && req.body.buildingRoom != '') {
+        
+        pool.query('CALL searchAllInfoProductFromLocation(?,?,?)', [req.body.buildingName, req.body.buildingFloor, req.body.buildingRoom], function(err, rows) {
+            if(err) throw err;
+            var productFile = createProductInfoList(rows[0]);
+            // console.log(productFile)
+            res.send(productFile);
+        })
+    }
+    else {
+        
+        pool.query('CALL searchAllInfoProductFromAllLocation()', function(err, rows){
+            if(err) throw err;
+            var productFile = createProductInfoList(rows[0]);
+            res.send(productFile);
+        })
+    }
+})
+
 /*
  *******************************************************************
  *******************************************************************
@@ -1266,3 +1436,4 @@ app.post('/displayBarcodePaper', function(req, res) {
 app.listen(port, () => {
     console.log(`App listening at http://localhost:${port}`);
 });
+

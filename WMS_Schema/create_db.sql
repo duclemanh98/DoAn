@@ -168,6 +168,135 @@ DROP TABLE LocationTable;
 
 UPDATE LocationTable SET bin_status = 'free' WHERE bin_status != 'free';
 
+CALL ResetDatabase();
+####-----------------------------------
+## Reset database:
+DELIMITER &&
+DROP PROCEDURE IF EXISTS ResetDatabase;
+CREATE PROCEDURE ResetDatabase()
+BEGIN
+	### Drop database
+    DROP TABLE IF EXISTS id_barcode;
+	DROP TABLE IF EXISTS InventoryCheckingProductTable;
+	DROP TABLE IF EXISTS InventoryCheckingPaperTable;
+	DROP TABLE IF EXISTS SingleOutProductTable;
+	DROP TABLE IF EXISTS FactTable;
+	DROP TABLE IF EXISTS TotalOutProductTable;
+	DROP TABLE IF EXISTS OutPaperTable;
+	DROP TABLE IF EXISTS InProductTable;
+	DROP TABLE IF EXISTS InPaperTable;
+
+	##Create Table
+CREATE TABLE InPaperTable (
+	id INT auto_increment PRIMARY KEY,
+    supplier VARCHAR(100),
+    #receive_staff VARCHAR(50) NOT NULL DEFAULT '',
+    created_at TIMESTAMP DEFAULT NOW(),
+	cur_status CHAR(1) NOT NULL DEFAULT 'p',
+    paper_desc VARCHAR(100) NOT NULL DEFAULT '',
+    create_user VARCHAR(50),
+    confirm_user VARCHAR(500) DEFAULT '',
+    FOREIGN KEY (create_user) REFERENCES UserTable(username)
+    #cur_status has 2 values: 'p' = pending or 'c' = complete
+);
+
+CREATE TABLE InProductTable (
+	id VARCHAR(15) NOT NULL,
+    box_amount INT NOT NULL,
+    scan_number INT DEFAULT 0,
+    paper_id INT NOT NULL,
+    FOREIGN KEY (paper_id) REFERENCES InPaperTable(id),
+    FOREIGN KEY (id) REFERENCES ProductTypeTable(id),
+    PRIMARY KEY(id, paper_id)
+);
+
+CREATE TABLE OutPaperTable (
+	id INT auto_increment PRIMARY KEY,
+	buyer VARCHAR(100),
+    created_at TIMESTAMP DEFAULT NOW(),
+    cur_status CHAR(1) NOT NULL DEFAULT 'p',
+    paper_desc VARCHAR(1000) NOT NULL DEFAULT '',
+	create_user VARCHAR(50),
+    confirm_user VARCHAR(500) DEFAULT '',
+	FOREIGN KEY (create_user) REFERENCES UserTable(username)
+);
+
+CREATE TABLE TotalOutProductTable (
+	id VARCHAR(15) NOT NULL,
+    paper_id INT NOT NULL,
+    amount INT NOT NULL,
+    selected_amount INT DEFAULT 0,
+    FOREIGN KEY (id) REFERENCES ProductTypeTable(id),
+    FOREIGN KEY (paper_id) REFERENCES OutPaperTable(id),
+    PRIMARY KEY (id, paper_id)
+);
+#DROP TABLE FactTable;
+CREATE TABLE FactTable(
+	id INT PRIMARY KEY,
+    in_paper_id INT NOT NULL,
+    amount INT NOT NULL,
+    changed_amount INT NOT NULL,
+    location_id INT DEFAULT NULL,
+    product_type_id VARCHAR(15) NOT NULL,
+    old_location INT DEFAULT NULL,
+    FOREIGN KEY (in_paper_id) REFERENCES InPaperTable(id),
+    FOREIGN KEY (location_id) REFERENCES LocationTable(id),
+    FOREIGN KEY (product_type_id) REFERENCES ProductTypeTable(id),
+    FOREIGN KEY (old_location) REFERENCES LocationTable(id)
+);
+
+#DROP TABLE SingleOutProductTable;
+CREATE TABLE SingleOutProductTable (
+	id INT NOT NULL,
+    amount INT NOT NULL,
+    selected_amount INT DEFAULT 0,
+    paper_id INT NOT NULL,
+    cur_status CHAR(1) DEFAULT 'p',
+    FOREIGN KEY (id) REFERENCES FactTable(id),
+    FOREIGN KEY (paper_id) REFERENCES OutPaperTable(id),
+    PRIMARY KEY (id, paper_id)
+);
+
+CREATE TABLE id_barcode (
+	id INT auto_increment PRIMARY KEY,
+    product_type_id VARCHAR(15),
+    paper_id INT NOT NULL,
+    FOREIGN KEY (product_type_id) references ProductTypeTable(id),
+    FOREIGN KEY (paper_id) REFERENCES InPaperTable(id)
+);
+
+CREATE TABLE InventoryCheckingPaperTable (
+	id INT auto_increment PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT NOW(),
+    first_location INT,
+    last_location INT,
+    cur_status CHAR(1) DEFAULT 'p',
+    paper_desc VARCHAR(1000) DEFAULT '',
+    in_status INT DEFAULT 0,
+    out_status INT DEFAULT 0,
+    create_user VARCHAR(50),
+    FOREIGN KEY (first_location) REFERENCES LocationTable(id),
+    FOREIGN KEY (last_location) REFERENCES LocationTable(id),
+    FOREIGN KEY (create_user) REFERENCES UserTable(username)
+);
+
+CREATE TABLE InventoryCheckingProductTable (
+	id INT,
+    paper_id INT,
+    sys_amount INT DEFAULT 0,
+    real_amount INT DEFAULT 0,
+    mis_amount INT DEFAULT 0,
+    product_dir CHAR(1) DEFAULT 'i',            #i: in, o: out
+    cur_status CHAR(1) DEFAULT 'p',				## p - pending, c - complete and correct,  or m - complete but missing
+    FOREIGN KEY(id) references FactTable(id),
+    FOREIGN KEY (paper_id) REFERENCES InventoryCheckingPaperTable(id)
+);
+
+	UPDATE LocationTable SET bin_status = 'free' WHERE bin_status != 'free';
+END &&
+DELIMITER ;
+
+
 ####-----------------------------------
 ## Function to create barcode for product
 DELIMITER &&

@@ -15,7 +15,6 @@ CREATE TABLE UserTable (
 );
 
 SELECT * FROM UserTable;
-
 ###### Procedure to Deal with all action related to users
 
 #-------------------------------------

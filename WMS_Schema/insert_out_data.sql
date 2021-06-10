@@ -191,7 +191,7 @@ BEGIN
 			UPDATE LocationTable SET bin_status = 'occu' WHERE LocationTable.id = location;
 		END IF;
 	END IF;
-    CALL complete_out_paper(out_paper);
+    #CALL complete_out_paper(out_paper);
 END &&
 DELIMITER ;
 #--------------------------------
@@ -219,7 +219,7 @@ BEGIN
 	DECLARE temp_name VARCHAR(500);
     IF confirmUser != '' THEN
 		SELECT confirm_user INTO username FROM OutPaperTable WHERE id = paper;
-		IF ISNULL(username) = 1 THEN
+		IF ISNULL(username) = 1 OR username = '' THEN
 			UPDATE OutPaperTable SET confirm_user = confirmUser WHERE id = paper;
 		ELSE
 			SELECT confirm_user INTO temp_name FROM OutPaperTable WHERE id = paper;
